@@ -1,0 +1,404 @@
+{
+  "intents": [
+    {
+      "tag": "greeting",
+      "patterns": [
+        "xin chào",
+        "chào bạn",
+        "hello",
+        "hi",
+        "chào buổi sáng",
+        "chào buổi chiều",
+        "chào buổi tối",
+        "chào shop",
+        "alo",
+        "có ai ở đó không",
+        "ê",
+        "này",
+        "hello bạn",
+        "xin chào shop"
+      ],
+      "responses": [
+        "Xin chào! Tôi có thể giúp gì cho bạn hôm nay ạ?",
+        "Chào bạn! Mình là trợ lý đặt đồ ăn, bạn cần tư vấn món gì ạ?",
+        "Xin chào! Hôm nay bạn muốn thưởng thức món gì ạ?",
+        "Chào mừng bạn đến với cửa hàng của chúng tôi! Bạn muốn đặt món gì ạ?",
+        "Xin chào! Mình có thể giúp gì cho bữa ăn của bạn hôm nay?"
+      ]
+    },
+    {
+      "tag": "order_food",
+      "patterns": [
+        "tôi muốn đặt món",
+        "cho tôi đặt đồ ăn",
+        "mình muốn gọi món",
+        "đặt đồ ăn",
+        "gọi món",
+        "tôi muốn ăn",
+        "cho tôi món",
+        "đặt giúp tôi",
+        "tôi cần đặt món",
+        "mình muốn đặt đồ ăn",
+        "đặt món giúp mình",
+        "tôi đặt món",
+        "cho tôi gọi món",
+        "muốn đặt món ăn",
+        "tôi cần gọi đồ ăn",
+        "đặt giúp tôi món"
+      ],
+      "responses": [
+        "Vâng ạ! Bạn muốn đặt món gì ạ?",
+        "Mời bạn chọn món bạn muốn đặt. Chúng tôi có nhiều món ngon đang chờ bạn khám phá ạ!",
+        "Bạn thích món gì? Tôi sẽ giúp bạn đặt ngay ạ.",
+        "Vâng, mời bạn chọn món ạ. Bạn có thể kể tên món hoặc xem thực đơn của chúng tôi.",
+        "Được rồi ạ! Bạn muốn ăn gì hôm nay?"
+      ]
+    },
+    {
+      "tag": "food_item",
+      "patterns": [
+        "phở bò",
+        "bún bò",
+        "cơm gà",
+        "bánh mì",
+        "bún đậu mắm tôm",
+        "phở gà",
+        "bánh xèo",
+        "hủ tiếu",
+        "bún riêu",
+        "bánh cuốn",
+        "xôi",
+        "cháo lòng",
+        "bún chả",
+        "cơm tấm",
+        "bánh tráng trộn",
+        "cơm sườn",
+        "bún thịt nướng",
+        "phở cuốn",
+        "bánh canh",
+        "bún mọc",
+        "bánh mì pate",
+        "bún đậu",
+        "bánh đa cua",
+        "bún ốc",
+        "bánh khọt",
+        "bánh bèo",
+        "bánh nậm",
+        "bánh bột lọc",
+        "bún mắm",
+        "bánh đúc",
+        "bánh cuốn thịt nướng",
+        "bánh xèo tôm nhảy",
+        "bún bò huế",
+        "bánh mì xíu mại",
+        "bánh mì chảo",
+        "bánh mì trứng"
+      ],
+      "responses": [
+        "Bạn muốn đặt món %s đúng không ạ?",
+        "%s là lựa chọn tuyệt vời. Bạn muốn đặt mấy phần ạ?",
+        "%s đang có sẵn. Bạn muốn đặt bao nhiêu phần ạ?",
+        "Món %s của chúng tôi rất được ưa chuộng. Bạn muốn đặt mấy phần ạ?",
+        "Vâng, %s đang có sẵn. Bạn muốn đặt mấy phần ạ?"
+      ]
+    },
+    {
+      "tag": "quantity",
+      "patterns": [
+        "1 phần",
+        "một phần",
+        "2 phần",
+        "hai phần",
+        "3 phần",
+        "ba phần",
+        "4 phần",
+        "bốn phần",
+        "5 phần",
+        "năm phần",
+        "6 phần",
+        "sáu phần",
+        "7 phần",
+        "bảy phần",
+        "8 phần",
+        "tám phần",
+        "9 phần",
+        "chín phần",
+        "10 phần",
+        "mười phần",
+        "một suất",
+        "hai suất",
+        "ba suất",
+        "bốn suất",
+        "năm suất",
+        "một đĩa",
+        "hai đĩa",
+        "một tô",
+        "hai tô",
+        "một dĩa",
+        "hai dĩa"
+      ],
+      "responses": [
+        "Đã ghi nhận %s. Bạn có muốn thêm món gì nữa không ạ?",
+        "Đã thêm %s vào đơn hàng. Bạn muốn gọi thêm món gì nữa không?",
+        "%s đã được thêm vào giỏ. Bạn còn muốn đặt thêm gì không?",
+        "Vâng, %s đã được thêm vào đơn hàng. Bạn có muốn gọi thêm món gì nữa không ạ?",
+        "Đã cập nhật %s. Bạn còn muốn đặt thêm món nào nữa không ạ?"
+      ]
+    },
+    {
+      "tag": "menu",
+      "patterns": [
+        "cho xem menu",
+        "thực đơn có gì",
+        "có món gì ngon",
+        "hôm nay có gì ngon",
+        "cho xem thực đơn",
+        "có món gì đặc biệt",
+        "menu hôm nay",
+        "có những món gì",
+        "cho mình xem menu",
+        "có món nào ngon",
+        "giới thiệu món ăn",
+        "có món gì mới",
+        "món đặc sản là gì",
+        "món bán chạy",
+        "món nào ngon nhất",
+        "có món chay không",
+        "thực đơn hôm nay"
+      ],
+      "responses": [
+        "Đây là thực đơn của chúng tôi ạ:\n- Phở bò: 40,000đ\n- Bún bò: 35,000đ\n- Cơm gà: 35,000đ\n- Bánh mì: 20,000đ\n- Bún đậu mắm tôm: 45,000đ\n- Phở gà: 35,000đ\n- Bánh xèo: 40,000đ\n- Hủ tiếu: 35,000đ\n- Bún riêu: 30,000đ\n- Bánh cuốn: 35,000đ\n- Xôi: 25,000đ\n- Cháo lòng: 35,000đ\n- Bún chả: 40,000đ\n- Cơm tấm: 40,000đ\n- Bánh tráng trộn: 25,000đ\n\nBạn muốn đặt món nào ạ?",
+        "Mời bạn xem thực đơn của chúng tôi ạ:\n\nMÓN CHÍNH:\n- Phở bò: 40,000đ\n- Bún bò: 35,000đ\n- Cơm gà: 35,000đ\n- Bún đậu mắm tôm: 45,000đ\n- Phở gà: 35,000đ\n- Bánh xèo: 40,000đ\n- Hủ tiếu: 35,000đ\n- Bún riêu: 30,000đ\n\nMÓN PHỤ/ĂN VẶT:\n- Bánh mì: 20,000đ\n- Bánh cuốn: 35,000đ\n- Xôi: 25,000đ\n- Bánh tráng trộn: 25,000đ\n- Cháo lòng: 35,000đ\n- Bún chả: 40,000đ\n- Cơm tấm: 40,000đ\n\nBạn thích món nào ạ?",
+        "Chúng tôi có các món sau ạ:\n\nĐẶC SẢN:\n- Bún đậu mắm tôm: 45,000đ\n- Phở bò: 40,000đ\n- Bánh xèo: 40,000đ\n- Bún chả: 40,000đ\n\nMÓN PHỔ BIẾN:\n- Cơm gà: 35,000đ\n- Phở gà: 35,000đ\n- Hủ tiếu: 35,000đ\n- Bún riêu: 30,000đ\n- Bánh cuốn: 35,000đ\n\nĐỒ UỐNG:\n- Nước ngọt: 15,000đ\n- Trà đá: 5,000đ\n- Nước suối: 10,000đ\n\nBạn muốn đặt món gì ạ?"
+      ]
+    },
+    {
+      "tag": "thanks",
+      "patterns": [
+        "cảm ơn",
+        "cảm ơn bạn",
+        "cám ơn",
+        "cám ơn nhiều",
+        "tốt lắm",
+        "tuyệt vời",
+        "cảm ơn nhé",
+        "cảm ơn shop",
+        "cảm ơn nha",
+        "cảm ơn rất nhiều",
+        "cám ơn shop",
+        "cám ơn nha",
+        "cám ơn rất nhiều",
+        "ok cảm ơn",
+        "được rồi cảm ơn",
+        "tuyệt vời cảm ơn",
+        "tốt quá cảm ơn",
+        "cảm ơn ad"
+      ],
+      "responses": [
+        "Không có gì ạ! Rất vui được phục vụ bạn.",
+        "Cảm ơn bạn đã sử dụng dịch vụ của chúng tôi! Nếu cần thêm gì bạn cứ nói nhé!",
+        "Rất hân hạnh được phục vụ bạn ạ! Chúc bạn ngon miệng!",
+        "Không có chi ạ! Nếu cần thêm gì bạn cứ gọi mình nhé!",
+        "Cảm ơn bạn đã tin tưởng ạ! Hẹn gặp lại bạn trong những lần sau!"
+      ]
+    },
+    {
+      "tag": "goodbye",
+      "patterns": [
+        "tạm biệt",
+        "hẹn gặp lại",
+        "bye",
+        "tạm biệt nhé",
+        "hẹn lần sau",
+        "thôi tạm biệt",
+        "thôi đi đây",
+        "thôi để lúc khác",
+        "thôi tôi đi đây",
+        "bye bye",
+        "bái bai",
+        "tạm biệt nha",
+        "hẹn gặp lại sau",
+        "thôi tôi off đây",
+        "thôi tôi đi ngủ đây",
+        "hẹn gặp lại bạn sau"
+      ],
+      "responses": [
+        "Tạm biệt bạn! Hẹn gặp lại lần sau ạ!",
+        "Cảm ơn bạn đã ghé thăm. Hẹn gặp lại bạn trong những lần sau nhé!",
+        "Chúc bạn một ngày tốt lành! Hẹn gặp lại ạ!",
+        "Tạm biệt bạn! Nếu cần gì cứ quay lại nhé!",
+        "Hẹn gặp lại bạn trong những lần đặt hàng tiếp theo ạ!"
+      ]
+    },
+    {
+      "tag": "delivery",
+      "patterns": [
+        "có ship không",
+        "giao hàng thế nào",
+        "phí ship bao nhiêu",
+        "có giao hàng tận nơi không",
+        "ship cod được không",
+        "có giao hàng không",
+        "giao hàng mất bao lâu",
+        "thời gian giao hàng",
+        "ship tận nơi không",
+        "giao hàng nhanh không",
+        "có giao hàng ngoại thành không",
+        "ship nhanh không",
+        "có giao hàng giờ hành chính không",
+        "có ship tối không",
+        "giao hàng nhanh nhất lúc mấy giờ",
+        "có giao hàng đêm không"
+      ],
+      "responses": [
+        "Chúng tôi có dịch vụ giao hàng tận nơi với phí ship 15,000đ cho đơn dưới 50,000đ. Đơn từ 50,000đ trở lên được miễn phí ship ạ. Thời gian giao hàng từ 20-30 phút trong bán kính 5km.",
+        "Phí ship là 15,000đ cho đơn dưới 50,000đ. Đơn từ 50,000đ trở lên được miễn phí ship. Chúng tôi giao hàng từ 6h sáng đến 21h tối hàng ngày ạ.",
+        "Chúng tôi hỗ trợ giao hàng tận nơi. Phí ship 15,000đ cho đơn dưới 50,000đ, miễn phí ship cho đơn từ 50,000đ trở lên. Thời gian giao hàng từ 20-45 phút tùy địa chỉ ạ.",
+        "Vâng, chúng tôi có giao hàng tận nơi ạ. Phí ship 15,000đ cho đơn dưới 50,000đ, đơn từ 50,000đ trở lên được miễn phí ship. Thời gian giao hàng từ 20-30 phút trong nội thành ạ.",
+        "Chúng tôi giao hàng tận nơi từ 6h sáng đến 21h tối hàng ngày. Phí ship 15,000đ cho đơn dưới 50,000đ, miễn phí ship cho đơn từ 50,000đ trở lên ạ."
+      ]
+    },
+    {
+      "tag": "payment",
+      "patterns": [
+        "thanh toán thế nào",
+        "có nhận thẻ không",
+        "thanh toán online được không",
+        "có nhận momo không",
+        "trả tiền mặt được không",
+        "có chuyển khoản được không",
+        "thanh toán bằng gì",
+        "có nhận zalo pay không",
+        "có nhận ví điện tử không",
+        "thanh toán khi nhận hàng được không",
+        "có nhận thẻ visa không",
+        "có nhận thẻ mastercard không",
+        "có nhận thẻ quốc tế không",
+        "có nhận tiền mặt không",
+        "có nhận tiền mặt khi giao hàng không",
+        "có nhận thẻ nội địa không"
+      ],
+      "responses": [
+        "Chúng tôi chấp nhận nhiều hình thức thanh toán ạ:\n- Tiền mặt khi nhận hàng (COD)\n- Chuyển khoản ngân hàng\n- Ví điện tử: Momo, ZaloPay, VNPay\n- Thẻ tín dụng/quốc tế: Visa, Mastercard, JCB\n- Thẻ ATM nội địa",
+        "Bạn có thể thanh toán bằng nhiều cách tiện lợi ạ:\n1. Tiền mặt khi nhận hàng\n2. Chuyển khoản ngân hàng\n3. Quét mã QR qua Momo, ZaloPay\n4. Thẻ tín dụng/quốc tế\nBạn muốn thanh toán bằng hình thức nào ạ?",
+        "Chúng tôi hỗ trợ đa dạng hình thức thanh toán để phục vụ quý khách tốt nhất ạ:\n\n• Tiền mặt khi nhận hàng (COD)\n• Chuyển khoản ngân hàng\n• Ví điện tử: Momo, ZaloPay, VNPay\n• Thẻ tín dụng/quốc tế: Visa, Mastercard, JCB\n• Thẻ ATM nội địa\n\nBạn muốn thanh toán bằng hình thức nào ạ?"
+      ]
+    },
+    {
+      "tag": "hours",
+      "patterns": [
+        "mấy giờ mở cửa",
+        "thời gian mở cửa",
+        "cửa hàng mở đến mấy giờ",
+        "có mở cửa không",
+        "hôm nay có mở không",
+        "mở cửa lúc mấy giờ",
+        "đóng cửa lúc mấy giờ",
+        "thứ 7 có mở không",
+        "chủ nhật có mở không",
+        "tết có mở không",
+        "lễ có mở cửa không",
+        "có phục vụ sáng sớm không",
+        "có phục vụ đêm khuya không",
+        "có mở cửa thứ 2 không",
+        "có mở cửa cuối tuần không",
+        "có mở cửa ngày lễ không"
+      ],
+      "responses": [
+        "Cửa hàng chúng tôi mở cửa tất cả các ngày trong tuần từ 6h00 sáng đến 22h00 tối ạ. Riêng thứ 7 và chủ nhật mở đến 23h00 tối để phục vụ quý khách.",
+        "Chúng tôi phục vụ từ 6:00 sáng đến 22:00 tối hàng ngày. Thứ 7 và chủ nhật mở cửa đến 23h00 tối ạ. Các ngày lễ vẫn mở cửa bình thường.",
+        "Giờ mở cửa của chúng tôi ạ:\n• Thứ 2 - Thứ 6: 6h00 - 22h00\n• Thứ 7 - Chủ nhật: 6h00 - 23h00\n\nCác ngày lễ vẫn mở cửa bình thường. Nếu có thay đổi, chúng tôi sẽ thông báo trước ạ.",
+        "Chúng tôi mở cửa tất cả các ngày trong tuần ạ:\n- Sáng: 6h00 - 11h00\n- Chiều: 13h00 - 22h00\nRiêng cuối tuần (thứ 7, chủ nhật) mở đến 23h00 tối."
+      ]
+    },
+    {
+      "tag": "location",
+      "patterns": [
+        "cửa hàng ở đâu",
+        "địa chỉ cửa hàng",
+        "chỗ các bạn ở đâu",
+        "có chi nhánh nào",
+        "có cơ sở nào khác không",
+        "cửa hàng nằm ở đâu",
+        "địa chỉ chính xác",
+        "có bản đồ không",
+        "chỉ đường đi",
+        "có gần đây không",
+        "có ở quận 1 không",
+        "có ở hồ chí minh không",
+        "có ở hà nội không",
+        "có giao hàng quận 7 không"
+      ],
+      "responses": [
+        "Cửa hàng chính của chúng tôi tọa lạc tại: 123 Đường Nguyễn Văn Linh, Quận 7, TP.HCM. Bạn có thể tìm thấy chúng tôi trên Google Maps với từ khóa 'Nhà hàng ABC'. Chúng tôi cũng có dịch vụ giao hàng tận nơi trong phạm vi 10km ạ.",
+        "Địa chỉ cửa hàng: 123 Đường Nguyễn Văn Linh, Quận 7, TP.HCM. Chúng tôi nằm ngay gần trung tâm thương mại SC VivoCity. Hiện tại chúng tôi mới chỉ có 1 cơ sở tại đây ạ. Bạn cần chỉ đường không ạ?",
+        "Chúng tôi đặt tại 123 Đường Nguyễn Văn Linh, Quận 7, TP.HCM. Giờ mở cửa từ 6h sáng đến 10h tối tất cả các ngày trong tuần. Bạn có thể ghé thăm hoặc đặt hàng online để được giao tận nơi ạ."
+      ]
+    },
+    {
+      "tag": "promotion",
+      "patterns": [
+        "có khuyến mãi gì không",
+        "đang có chương trình gì",
+        "có giảm giá không",
+        "có mã giảm giá không",
+        "có ưu đãi gì không",
+        "có khuyến mại gì hôm nay",
+        "có combo nào rẻ không",
+        "có đồng giá không",
+        "có món nào đang sale",
+        "có chương trình khuyến mãi gì",
+        "có ưu đãi cho khách mới không",
+        "có giảm giá cho đơn hàng lớn không"
+      ],
+      "responses": [
+        "Hiện tại chúng tôi đang có các chương trình khuyến mãi hấp dẫn sau ạ:\n- Giảm 20% cho đơn hàng từ 200,000đ trở lên (áp dụng mã GIAM20)\n- Mua 1 tặng 1 các món nước mỗi thứ 3 hàng tuần\n- Miễn phí ship cho đơn từ 50,000đ trở lên\n- Giảm 10% cho khách hàng mới (áp dụng lần đầu đặt hàng)\n\nBạn muốn biết thêm thông tin chi tiết về chương trình nào ạ?",
+        "Chúng tôi luôn có nhiều ưu đãi dành cho khách hàng ạ:\n\n🔥 COMBO ƯU ĐÃI:\n- Combo 2 người: 1 phở bò + 1 bánh mì + 2 nước: 80,000đ (tiết kiệm 20,000đ)\n- Combo gia đình: 3 món chính + 3 nước: 150,000đ (tiết kiệm 30,000đ)\n\n🎁 KHUYẾN MÃI KHÁC:\n- Tặng trà đá miễn phí cho mọi đơn hàng\n- Giảm 30% cho đơn hàng từ 300,000đ (áp dụng mã GIAM30)\n- Tích điểm đổi quà cho khách hàng thân thiết\n\nBạn quan tâm đến chương trình nào ạ?",
+        "Hiện tại chúng tôi đang có các chương trình ưu đãi sau ạ:\n\n1. Giảm 10% cho đơn hàng từ 100,000đ\n2. Miễn phí ship cho đơn từ 50,000đ\n3. Tặng nước ngọt cho đơn hàng từ 150,000đ\n4. Giảm 20% cho khách hàng mới (áp dụng lần đầu)\n5. Tặng voucher 50,000đ cho đơn hàng tiếp theo\n\nBạn muốn biết thêm chi tiết về chương trình nào không ạ?"
+      ]
+    },
+    {
+      "tag": "contact",
+      "patterns": [
+        "số điện thoại liên hệ",
+        "gọi điện đặt hàng",
+        "hotline là gì",
+        "số điện thoại cửa hàng",
+        "có zalo không",
+        "có facebook không",
+        "liên hệ thế nào",
+        "có hỗ trợ online không",
+        "có tư vấn qua điện thoại không",
+        "số điện thoại đặt bàn",
+        "gặp nhân viên tư vấn"
+      ],
+      "responses": [
+        "Bạn có thể liên hệ với chúng tôi qua các kênh sau ạ:\n- Hotline đặt hàng: 1900 1234 (7h-22h hàng ngày)\n- Zalo: 0909 123 456\n- Facebook: facebook.com/nhahangABC\n- Email: info@nhahangabc.com\n- Địa chỉ: 123 Đường Nguyễn Văn Linh, Quận 7, TP.HCM\n\nĐội ngũ nhân viên của chúng tôi luôn sẵn sàng hỗ trợ bạn từ 6h sáng đến 10h tối mỗi ngày ạ.",
+        "Để được tư vấn và đặt hàng, bạn có thể liên hệ:\n📞 Hotline: 1900 1234 (7h-22h)\n💬 Zalo: 0909 123 456\n🌐 Facebook: facebook.com/nhahangABC\n📍 Địa chỉ: 123 Đường Nguyễn Văn Linh, Quận 7, TP.HCM\n\nChúng tôi luôn sẵn sàng phục vụ bạn ạ!",
+        "Thông tin liên hệ của chúng tôi ạ:\n\n• Điện thoại: 1900 1234 (7h-22h)\n• Zalo: 0909 123 456\n• Facebook: facebook.com/nhahangABC\n• Địa chỉ: 123 Đường Nguyễn Văn Linh, Quận 7, TP.HCM\n• Giờ mở cửa: 6h00 - 22h00 hàng ngày\n\nBạn cần hỗ trợ gì ạ?"
+      ]
+    },
+    {
+      "tag": "food_quality",
+      "patterns": [
+        "đồ ăn có ngon không",
+        "có đảm bảo vệ sinh không",
+        "nguồn gốc thực phẩm",
+        "có tươi sống không",
+        "có đảm bảo an toàn thực phẩm không",
+        "có món chay không",
+        "có món ăn kiêng không",
+        "có món ít dầu mỡ không",
+        "có món ăn healthy không",
+        "có món cho người tiểu đường không",
+        "có món cho trẻ em không",
+        "có phần ăn nhẹ không"
+      ],
+      "responses": [
+        "Chúng tôi tự hào về chất lượng phục vụ và vệ sinh an toàn thực phẩm ạ. Tất cả nguyên liệu đều được chọn lọc kỹ lưỡng từ các nhà cung cấp uy tín, có nguồn gốc rõ ràng và đảm bảo tươi ngon. Đầu bếp của chúng tôi đều là những người có tay nghề cao và được đào tạo bài bản về vệ sinh an toàn thực phẩm.",
+        "Về chất lượng món ăn, chúng tôi cam kết:\n- Nguyên liệu tươi ngon, có nguồn gốc rõ ràng\n- Quy trình chế biến đảm bảo vệ sinh\n- Không sử dụng phụ gia độc hại\n- Thực đơn đa dạng, phù hợp nhiều đối tượng\n\nChúng tôi cũng có nhiều lựa chọn cho thực khách ăn kiêng, ăn chay và trẻ em ạ.",
+        "Chất lượng và vệ sinh an toàn thực phẩm là ưu tiên hàng đầu của chúng tôi ạ. Chúng tôi có:\n• Nguồn cung cấp thực phẩm uy tín, có giấy tờ đầy đủ\n• Quy trình chế biến khép kín, đảm bảo vệ sinh\n• Đầu bếp chuyên nghiệp, có chứng chỉ an toàn thực phẩm\n• Thực đơn đa dạng, phù hợp nhiều nhu cầu: món chay, món kiêng, món healthy...\n\nBạn có yêu cầu đặc biệt gì về món ăn không ạ?"
+      ]
+    }
+  ]
+}

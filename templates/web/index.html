@@ -1,0 +1,137 @@
+{% extends 'web/base.html' %}
+{% load static %}
+
+{% block title %}Trang chủ - Food Delivery{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Banner Carousel -->
+    {% if banners %}
+    <div id="bannerCarousel" class="carousel slide banner-carousel mb-5" data-bs-ride="carousel">
+        <div class="carousel-indicators">
+            {% for banner in banners %}
+            <button type="button" data-bs-target="#bannerCarousel" data-bs-slide-to="{{ forloop.counter0 }}" {% if forloop.first %}class="active"{% endif %}></button>
+            {% endfor %}
+        </div>
+        <div class="carousel-inner">
+            {% for banner in banners %}
+            <div class="carousel-item {% if forloop.first %}active{% endif %}">
+                <img src="{{ banner.image.url }}" class="d-block w-100" alt="{{ banner.title }}">
+                <div class="carousel-caption d-none d-md-block">
+                    <h3>{{ banner.title }}</h3>
+                    <p>{{ banner.description }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <button class="carousel-control-prev" type="button" data-bs-target="#bannerCarousel" data-bs-slide="prev">
+            <span class="carousel-control-prev-icon"></span>
+        </button>
+        <button class="carousel-control-next" type="button" data-bs-target="#bannerCarousel" data-bs-slide="next">
+            <span class="carousel-control-next-icon"></span>
+        </button>
+    </div>
+    {% endif %}
+
+    <!-- Categories Section -->
+    <section class="mb-5">
+        <h2 class="section-title"><i class="fas fa-th-large me-2"></i>Danh mục</h2>
+        <div class="row g-3">
+            {% for category in categories %}
+            <div class="col-6 col-md-4 col-lg-2">
+                <a href="#" class="text-decoration-none">
+                    <div class="category-card">
+                        {% if category.image %}
+                        <img src="{{ category.image.url }}" alt="{{ category.name }}">
+                        {% else %}
+                        <i class="fas fa-utensils fa-3x mb-2 text-muted"></i>
+                        {% endif %}
+                        <h6 class="mb-0">{{ category.name }}</h6>
+                    </div>
+                </a>
+            </div>
+            {% empty %}
+            <div class="col-12">
+                <p class="text-muted">Chưa có danh mục nào.</p>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- Restaurants Section -->
+    <section class="mb-5">
+        <h2 class="section-title"><i class="fas fa-store me-2"></i>Nhà hàng nổi bật</h2>
+        <div class="row g-4">
+            {% for restaurant in restaurants %}
+            <div class="col-md-6 col-lg-4">
+                <a href="{% url 'web_restaurant_detail' restaurant.id %}" class="text-decoration-none">
+                    <div class="card h-100">
+                        {% if restaurant.image %}
+                        <img src="{{ restaurant.image.url }}" class="card-img-top" alt="{{ restaurant.name }}">
+                        {% else %}
+                        <div class="card-img-top bg-secondary d-flex align-items-center justify-content-center">
+                            <i class="fas fa-store fa-3x text-white"></i>
+                        </div>
+                        {% endif %}
+                        <div class="card-body">
+                            <h5 class="card-title text-dark">{{ restaurant.name }}</h5>
+                            <p class="card-text text-muted small">
+                                <i class="fas fa-map-marker-alt me-1"></i>{{ restaurant.address|truncatechars:50 }}
+                            </p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="rating">
+                                    <i class="fas fa-star"></i> {{ restaurant.rating|default:"4.5" }}
+                                </span>
+                                <span class="text-muted small">
+                                    <i class="fas fa-clock me-1"></i>{{ restaurant.delivery_time|default:"30-45" }} phút
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            {% empty %}
+            <div class="col-12">
+                <p class="text-muted">Chưa có nhà hàng nào.</p>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- Foods Section -->
+    <section class="mb-5">
+        <h2 class="section-title"><i class="fas fa-fire me-2"></i>Món ăn phổ biến</h2>
+        <div class="row g-4">
+            {% for food in foods %}
+            <div class="col-md-6 col-lg-3">
+                <a href="{% url 'web_food_detail' food.id %}" class="text-decoration-none">
+                    <div class="card h-100">
+                        {% if food.image %}
+                        <img src="{{ food.image.url }}" class="card-img-top" alt="{{ food.name }}">
+                        {% else %}
+                        <div class="card-img-top bg-secondary d-flex align-items-center justify-content-center">
+                            <i class="fas fa-hamburger fa-3x text-white"></i>
+                        </div>
+                        {% endif %}
+                        <div class="card-body">
+                            <h6 class="card-title text-dark">{{ food.name }}</h6>
+                            <p class="card-text text-muted small">{{ food.restaurant.name }}</p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="price">{{ food.price|floatformat:0 }}đ</span>
+                                <span class="rating">
+                                    <i class="fas fa-star"></i> {{ food.rating|default:"4.5" }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            {% empty %}
+            <div class="col-12">
+                <p class="text-muted">Chưa có món ăn nào.</p>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+</div>
+{% endblock %}

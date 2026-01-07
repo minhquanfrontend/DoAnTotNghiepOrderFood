@@ -1,0 +1,512 @@
+{% extends "admin/base_site.html" %}
+{% load static i18n %}
+
+{% block extrahead %}
+{{ block.super }}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+<div id="seller-dashboard">
+    <!-- Header with Date Filter -->
+    <div class="dashboard-header" style="background: linear-gradient(135deg, #1a237e 0%, #3949ab 100%); padding: 24px; border-radius: 16px; margin-bottom: 24px; color: white; box-shadow: 0 4px 20px rgba(26, 35, 126, 0.3);">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+            <div>
+                <h1 style="margin: 0; font-size: 28px; font-weight: 700;">
+                    <i class="fas fa-store" style="margin-right: 12px;"></i>
+                    {{ restaurant_name|default:"Nhà hàng của bạn" }}
+                </h1>
+                <p style="margin: 8px 0 0 0; opacity: 0.9; font-size: 15px;">
+                    Dashboard quản lý nhà hàng - Cập nhật realtime
+                </p>
+            </div>
+            <div style="display: flex; gap: 12px;">
+                <a href="/seller/restaurants/food/add/" style="padding: 12px 20px; background: rgba(255,255,255,0.2); border-radius: 10px; color: white; text-decoration: none; font-weight: 500; display: flex; align-items: center; gap: 8px; transition: all 0.3s;">
+                    <i class="fas fa-plus"></i> Thêm món ăn
+                </a>
+                <a href="/seller/orders/order/" style="padding: 12px 20px; background: #4caf50; border-radius: 10px; color: white; text-decoration: none; font-weight: 500; display: flex; align-items: center; gap: 8px; transition: all 0.3s;">
+                    <i class="fas fa-list"></i> Xem đơn hàng
+                </a>
+            </div>
+        </div>
+        <!-- Date Filter -->
+        <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.2);">
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <label style="color: white; font-weight: 500;">Từ:</label>
+                    <input type="date" id="startDate" style="padding: 10px 14px; border: none; border-radius: 8px; font-size: 14px; background: rgba(255,255,255,0.95); cursor: pointer;">
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <label style="color: white; font-weight: 500;">Đến:</label>
+                    <input type="date" id="endDate" style="padding: 10px 14px; border: none; border-radius: 8px; font-size: 14px; background: rgba(255,255,255,0.95); cursor: pointer;">
+                </div>
+                <button onclick="loadSellerData()" style="padding: 10px 20px; background: #4caf50; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s;">
+                    <i class="fas fa-sync-alt" style="margin-right: 6px;"></i>Cập nhật
+                </button>
+            </div>
+            <!-- Quick date buttons -->
+            <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+                <button onclick="setDateRange(7)" class="quick-date-btn" style="padding: 6px 14px; background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 20px; font-size: 13px; cursor: pointer; transition: all 0.3s;">7 ngày</button>
+                <button onclick="setDateRange(30)" class="quick-date-btn" style="padding: 6px 14px; background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 20px; font-size: 13px; cursor: pointer; transition: all 0.3s;">30 ngày</button>
+                <button onclick="setDateRange(90)" class="quick-date-btn" style="padding: 6px 14px; background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 20px; font-size: 13px; cursor: pointer; transition: all 0.3s;">90 ngày</button>
+                <button onclick="setDateRange(365)" class="quick-date-btn" style="padding: 6px 14px; background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 20px; font-size: 13px; cursor: pointer; transition: all 0.3s;">1 năm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 24px;">
+        <!-- Total Revenue -->
+        <div class="stat-card" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); padding: 24px; border-radius: 16px; color: white; box-shadow: 0 4px 15px rgba(17, 153, 142, 0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <p style="margin: 0; font-size: 14px; opacity: 0.9;">Tổng Doanh Thu</p>
+                    <h3 id="total-revenue" style="margin: 8px 0 0 0; font-size: 26px; font-weight: 700;">{{ total_revenue|floatformat:0|default:"0" }} ₫</h3>
+                </div>
+                <div style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-coins" style="font-size: 22px;"></i>
+                </div>
+            </div>
+            <p style="margin: 12px 0 0 0; font-size: 13px; opacity: 0.85;">
+                <i class="fas fa-calendar-day"></i> Hôm nay: {{ today_revenue|floatformat:0|default:"0" }} ₫
+            </p>
+        </div>
+
+        <!-- Total Orders -->
+        <div class="stat-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 24px; border-radius: 16px; color: white; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <p style="margin: 0; font-size: 14px; opacity: 0.9;">Tổng Đơn Hàng</p>
+                    <h3 id="total-orders" style="margin: 8px 0 0 0; font-size: 26px; font-weight: 700;">{{ total_orders|default:"0" }}</h3>
+                </div>
+                <div style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-shopping-bag" style="font-size: 22px;"></i>
+                </div>
+            </div>
+            <p style="margin: 12px 0 0 0; font-size: 13px; opacity: 0.85;">
+                <i class="fas fa-clock"></i> Hôm nay: {{ today_orders|default:"0" }} đơn
+            </p>
+        </div>
+
+        <!-- Pending Orders -->
+        <div class="stat-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 24px; border-radius: 16px; color: white; box-shadow: 0 4px 15px rgba(240, 147, 251, 0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <p style="margin: 0; font-size: 14px; opacity: 0.9;">Đơn Chờ Xử Lý</p>
+                    <h3 id="pending-orders" style="margin: 8px 0 0 0; font-size: 26px; font-weight: 700;">{{ pending_orders|default:"0" }}</h3>
+                </div>
+                <div style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-hourglass-half" style="font-size: 22px;"></i>
+                </div>
+            </div>
+            <p style="margin: 12px 0 0 0; font-size: 13px; opacity: 0.85;">
+                <i class="fas fa-check-circle"></i> Hoàn thành: {{ completed_orders|default:"0" }}
+            </p>
+        </div>
+
+        <!-- Total Foods -->
+        <div class="stat-card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); padding: 24px; border-radius: 16px; color: white; box-shadow: 0 4px 15px rgba(250, 112, 154, 0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <p style="margin: 0; font-size: 14px; opacity: 0.9;">Món Ăn</p>
+                    <h3 id="total-foods" style="margin: 8px 0 0 0; font-size: 26px; font-weight: 700;">{{ total_foods|default:"0" }}</h3>
+                </div>
+                <div style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-utensils" style="font-size: 22px;"></i>
+                </div>
+            </div>
+            <p style="margin: 12px 0 0 0; font-size: 13px; opacity: 0.85;">
+                <i class="fas fa-toggle-on"></i> Đang bán: {{ available_foods|default:"0" }}
+            </p>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="charts-row" style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-bottom: 24px;">
+        <!-- Revenue Chart -->
+        <div class="chart-card" style="background: white; padding: 24px; border-radius: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.08);">
+            <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: #333;">
+                <i class="fas fa-chart-line" style="color: #1a237e; margin-right: 10px;"></i>
+                Doanh Thu & Đơn Hàng (30 ngày)
+            </h3>
+            <canvas id="revenueChart" height="280"></canvas>
+        </div>
+
+        <!-- Status Distribution -->
+        <div class="chart-card" style="background: white; padding: 24px; border-radius: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.08);">
+            <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: #333;">
+                <i class="fas fa-chart-pie" style="color: #f5576c; margin-right: 10px;"></i>
+                Trạng Thái Đơn Hàng
+            </h3>
+            <canvas id="statusChart" height="280"></canvas>
+        </div>
+    </div>
+
+    <!-- Bottom Row -->
+    <div class="bottom-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+        <!-- Top Selling Foods -->
+        <div class="list-card" style="background: white; padding: 24px; border-radius: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.08);">
+            <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: #333;">
+                <i class="fas fa-fire" style="color: #ff6b6b; margin-right: 10px;"></i>
+                Món Bán Chạy
+            </h3>
+            <div id="top-foods-list">
+                {% for food in top_foods %}
+                <div style="display: flex; align-items: center; padding: 14px 0; border-bottom: 1px solid #f0f0f0;">
+                    <div style="width: 36px; height: 36px; background: linear-gradient(135deg, #ff6b6b 0%, #feca57 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; margin-right: 14px;">
+                        {{ forloop.counter }}
+                    </div>
+                    <div style="flex: 1;">
+                        <p style="margin: 0; font-weight: 600; color: #333;">{{ food.food__name }}</p>
+                        <p style="margin: 4px 0 0 0; font-size: 13px; color: #888;">{{ food.total_sold|default:0 }} phần đã bán</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <p style="margin: 0; font-weight: 700; color: #11998e;">{{ food.revenue|floatformat:0|default:"0" }} ₫</p>
+                    </div>
+                </div>
+                {% empty %}
+                <p style="color: #888; text-align: center; padding: 30px;">Chưa có dữ liệu bán hàng</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="list-card" style="background: white; padding: 24px; border-radius: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.08);">
+            <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: #333;">
+                <i class="fas fa-bolt" style="color: #ffc107; margin-right: 10px;"></i>
+                Quản Lý Nhanh
+            </h3>
+            <div style="display: grid; gap: 14px;">
+                <a href="/seller/restaurants/food/" style="display: flex; align-items: center; padding: 18px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 14px; color: white; text-decoration: none; transition: all 0.3s;">
+                    <i class="fas fa-hamburger" style="font-size: 22px; margin-right: 14px;"></i>
+                    <div>
+                        <span style="font-weight: 600; font-size: 15px;">Quản lý món ăn</span>
+                        <p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.85;">Thêm, sửa, xóa món ăn</p>
+                    </div>
+                </a>
+                <a href="/seller/orders/order/" style="display: flex; align-items: center; padding: 18px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); border-radius: 14px; color: white; text-decoration: none; transition: all 0.3s;">
+                    <i class="fas fa-clipboard-list" style="font-size: 22px; margin-right: 14px;"></i>
+                    <div>
+                        <span style="font-weight: 600; font-size: 15px;">Quản lý đơn hàng</span>
+                        <p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.85;">Xem và xử lý đơn hàng</p>
+                    </div>
+                </a>
+                <a href="/seller/restaurants/restaurant/" style="display: flex; align-items: center; padding: 18px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); border-radius: 14px; color: white; text-decoration: none; transition: all 0.3s;">
+                    <i class="fas fa-store-alt" style="font-size: 22px; margin-right: 14px;"></i>
+                    <div>
+                        <span style="font-weight: 600; font-size: 15px;">Thông tin nhà hàng</span>
+                        <p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.85;">Cập nhật thông tin cửa hàng</p>
+                    </div>
+                </a>
+                <a href="/seller/payments/payment/" style="display: flex; align-items: center; padding: 18px; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); border-radius: 14px; color: white; text-decoration: none; transition: all 0.3s;">
+                    <i class="fas fa-wallet" style="font-size: 22px; margin-right: 14px;"></i>
+                    <div>
+                        <span style="font-weight: 600; font-size: 15px;">Lịch sử thanh toán</span>
+                        <p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.85;">Xem các giao dịch</p>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Chart data from Django context (already JSON serialized)
+const chartLabels = JSON.parse('{{ chart_labels|safe|default:"[]" }}');
+const chartRevenue = JSON.parse('{{ chart_revenue|safe|default:"[]" }}');
+const chartOrders = JSON.parse('{{ chart_orders|safe|default:"[]" }}');
+const statusDistribution = JSON.parse('{{ status_distribution|safe|default:"[]" }}');
+
+// Format currency
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('vi-VN').format(amount) + ' ₫';
+}
+
+// Status labels
+function getStatusLabel(status) {
+    const labels = {
+        'pending': 'Chờ xác nhận',
+        'confirmed': 'Đã xác nhận',
+        'preparing': 'Đang chuẩn bị',
+        'ready': 'Sẵn sàng',
+        'assigned': 'Đã giao shipper',
+        'picked_up': 'Đã lấy hàng',
+        'delivering': 'Đang giao',
+        'delivered': 'Đã giao',
+        'completed': 'Hoàn thành',
+        'cancelled': 'Đã hủy'
+    };
+    return labels[status] || status;
+}
+
+// Status colors
+function getStatusColor(status) {
+    const colors = {
+        'pending': '#ffc107',
+        'confirmed': '#17a2b8',
+        'preparing': '#6f42c1',
+        'ready': '#20c997',
+        'assigned': '#007bff',
+        'picked_up': '#6610f2',
+        'delivering': '#fd7e14',
+        'delivered': '#28a745',
+        'completed': '#11998e',
+        'cancelled': '#dc3545'
+    };
+    return colors[status] || '#6c757d';
+}
+
+// Chart instances
+let revenueChart, statusChart;
+
+// Set date range
+function setDateRange(days) {
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    
+    document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
+    document.getElementById('endDate').value = endDate.toISOString().split('T')[0];
+    
+    // Only call API if initial load is done (user clicked a button)
+    if (initialLoadDone) {
+        loadSellerData();
+    }
+}
+
+// Load seller data via AJAX
+async function loadSellerData() {
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    
+    if (!startDate || !endDate) return;
+    
+    try {
+        const response = await fetch(`/api/orders/restaurant/dashboard/?start_date=${startDate}&end_date=${endDate}`, {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
+            }
+        });
+        if (!response.ok) throw new Error('Failed to fetch');
+        
+        const data = await response.json();
+        updateSellerDashboard(data);
+    } catch (error) {
+        console.error('Error loading seller data:', error);
+    }
+}
+
+// Update dashboard with new data
+function updateSellerDashboard(data) {
+    // Update stat cards - API returns data.revenue, data.orders, etc.
+    const totalRevenue = data.revenue?.potential_net_revenue || data.revenue?.net_revenue || 0;
+    document.getElementById('total-revenue').textContent = formatCurrency(totalRevenue);
+    
+    const totalOrders = data.orders?.total || 0;
+    document.getElementById('total-orders').textContent = totalOrders;
+    
+    const pendingOrders = data.orders?.pending || 0;
+    document.getElementById('pending-orders').textContent = pendingOrders;
+    
+    // Update top selling items - element ID is top-foods-list
+    // API returns top_selling_items with quantity_sold and revenue fields
+    if (data.top_selling_items && data.top_selling_items.length > 0) {
+        const topFoodsList = document.getElementById('top-foods-list');
+        if (topFoodsList) {
+            topFoodsList.innerHTML = data.top_selling_items.map((item, index) => `
+                <div style="display: flex; align-items: center; padding: 14px 0; border-bottom: 1px solid #f0f0f0;">
+                    <div style="width: 36px; height: 36px; background: linear-gradient(135deg, #ff6b6b 0%, #feca57 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; margin-right: 14px;">
+                        ${index + 1}
+                    </div>
+                    <div style="flex: 1;">
+                        <p style="margin: 0; font-weight: 600; color: #333;">${item.food__name || 'N/A'}</p>
+                        <p style="margin: 4px 0 0 0; font-size: 13px; color: #888;">${item.quantity_sold || item.total_sold || 0} phần đã bán</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <p style="margin: 0; font-weight: 700; color: #11998e;">${formatCurrency(item.revenue || 0)}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+    } else if (data.top_selling_items && data.top_selling_items.length === 0) {
+        const topFoodsList = document.getElementById('top-foods-list');
+        if (topFoodsList) {
+            topFoodsList.innerHTML = '<p style="color: #888; text-align: center; padding: 30px;">Chưa có dữ liệu bán hàng</p>';
+        }
+    }
+
+    // Update revenue chart - API returns data.chart.labels and data.chart.values
+    if (revenueChart && data.chart) {
+        revenueChart.data.labels = data.chart.labels || [];
+        revenueChart.data.datasets[0].data = data.chart.values || [];
+        // Orders data might not be in API, keep existing or set empty
+        revenueChart.update();
+    }
+
+    // Update status chart - API returns data.orders.by_status
+    const statusByStatus = data.orders?.by_status || data.order_stats;
+    if (statusChart && statusByStatus) {
+        const statusData = Object.entries(statusByStatus).map(([status, count]) => ({
+            status: status,
+            count: count
+        })).filter(item => item.count > 0);
+        
+        statusChart.data.labels = statusData.map(item => getStatusLabel(item.status));
+        statusChart.data.datasets[0].data = statusData.map(item => item.count);
+        statusChart.data.datasets[0].backgroundColor = statusData.map(item => getStatusColor(item.status));
+        statusChart.update();
+    }
+}
+
+// Initialize charts
+function initCharts() {
+    // Revenue Chart
+    const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+    revenueChart = new Chart(revenueCtx, {
+        type: 'line',
+        data: {
+            labels: chartLabels,
+            datasets: [{
+                label: 'Doanh thu (₫)',
+                data: chartRevenue,
+                borderColor: '#1a237e',
+                backgroundColor: 'rgba(26, 35, 126, 0.1)',
+                fill: true,
+                tension: 0.4,
+                yAxisID: 'y'
+            }, {
+                label: 'Số đơn',
+                data: chartOrders,
+                borderColor: '#f5576c',
+                backgroundColor: 'rgba(245, 87, 108, 0.1)',
+                fill: false,
+                tension: 0.4,
+                yAxisID: 'y1'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    ticks: {
+                        callback: function(value) {
+                            return formatCurrency(value);
+                        }
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            if (context.datasetIndex === 0) {
+                                return 'Doanh thu: ' + formatCurrency(context.raw);
+                            }
+                            return 'Số đơn: ' + context.raw;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Status Chart
+    const statusCtx = document.getElementById('statusChart').getContext('2d');
+    const statusLabels = statusDistribution.map(item => getStatusLabel(item.status));
+    const statusData = statusDistribution.map(item => item.count);
+    const statusColors = statusDistribution.map(item => getStatusColor(item.status));
+
+    statusChart = new Chart(statusCtx, {
+        type: 'doughnut',
+        data: {
+            labels: statusLabels,
+            datasets: [{
+                data: statusData,
+                backgroundColor: statusColors,
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 12,
+                        usePointStyle: true
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Track if initial load is done (to avoid overwriting Django context data)
+let initialLoadDone = false;
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize charts FIRST with Django context data
+    initCharts();
+    
+    // Set default date range display (30 days) but DON'T call API yet
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 30);
+    
+    document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
+    document.getElementById('endDate').value = endDate.toISOString().split('T')[0];
+    
+    // Mark initial load as done - subsequent date changes will call API
+    initialLoadDone = true;
+});
+</script>
+
+<style>
+#seller-dashboard {
+    position: relative;
+}
+.chart-card {
+    position: relative;
+    overflow: hidden;
+}
+.chart-card canvas {
+    max-height: 280px;
+}
+.quick-date-btn:hover {
+    background: rgba(255,255,255,0.4) !important;
+}
+.stat-card:hover {
+    transform: translateY(-3px);
+    transition: transform 0.3s ease;
+}
+.list-card a:hover {
+    transform: translateX(5px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+}
+#seller-dashboard a {
+    transition: all 0.3s ease;
+}
+</style>
+{% endblock %}

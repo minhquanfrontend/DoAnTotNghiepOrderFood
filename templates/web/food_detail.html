@@ -1,0 +1,112 @@
+{% extends 'web/base.html' %}
+{% load static %}
+
+{% block title %}{{ food.name }} - Food Delivery{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/">Trang chủ</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'web_restaurant_detail' restaurant.id %}">{{ restaurant.name }}</a></li>
+            <li class="breadcrumb-item active">{{ food.name }}</li>
+        </ol>
+    </nav>
+
+    <!-- Food Detail -->
+    <div class="row">
+        <div class="col-md-6">
+            {% if food.image %}
+            <img src="{{ food.image.url }}" class="img-fluid rounded shadow" alt="{{ food.name }}">
+            {% else %}
+            <div class="bg-secondary rounded d-flex align-items-center justify-content-center" style="height: 400px;">
+                <i class="fas fa-hamburger fa-5x text-white"></i>
+            </div>
+            {% endif %}
+        </div>
+        <div class="col-md-6">
+            <h1>{{ food.name }}</h1>
+            <p class="text-muted">
+                <a href="{% url 'web_restaurant_detail' restaurant.id %}" class="text-decoration-none">
+                    <i class="fas fa-store me-1"></i>{{ restaurant.name }}
+                </a>
+            </p>
+            <div class="d-flex gap-3 mb-3">
+                <span class="rating fs-5">
+                    <i class="fas fa-star"></i> {{ food.rating|default:"4.5" }}
+                </span>
+                <span class="text-muted">
+                    <i class="fas fa-shopping-bag me-1"></i>{{ food.total_orders|default:0 }} đã bán
+                </span>
+            </div>
+            <h2 class="price mb-4">{{ food.price|floatformat:0 }}đ</h2>
+            <p class="lead">{{ food.description }}</p>
+            
+            <!-- Quantity Selector -->
+            <div class="d-flex align-items-center gap-3 mb-4">
+                <label class="fw-bold">Số lượng:</label>
+                <div class="input-group" style="width: 150px;">
+                    <button class="btn btn-outline-secondary" type="button" onclick="decreaseQty()">-</button>
+                    <input type="number" class="form-control text-center" id="quantity" value="1" min="1">
+                    <button class="btn btn-outline-secondary" type="button" onclick="increaseQty()">+</button>
+                </div>
+            </div>
+
+            <button class="btn btn-primary btn-lg w-100">
+                <i class="fas fa-cart-plus me-2"></i>Thêm vào giỏ hàng
+            </button>
+        </div>
+    </div>
+
+    <!-- Reviews Section -->
+    <section class="mt-5">
+        <h3 class="section-title"><i class="fas fa-comments me-2"></i>Đánh giá</h3>
+        {% if reviews %}
+        <div class="row g-4">
+            {% for review in reviews %}
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <h6 class="mb-0">{{ review.user.get_full_name|default:review.user.username }}</h6>
+                                <small class="text-muted">{{ review.created_at|date:"d/m/Y H:i" }}</small>
+                            </div>
+                            <span class="rating">
+                                {% for i in "12345" %}
+                                    {% if forloop.counter <= review.rating %}
+                                    <i class="fas fa-star"></i>
+                                    {% else %}
+                                    <i class="far fa-star"></i>
+                                    {% endif %}
+                                {% endfor %}
+                            </span>
+                        </div>
+                        <p class="mb-0">{{ review.comment }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted">Chưa có đánh giá nào cho món ăn này.</p>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function increaseQty() {
+    var qty = document.getElementById('quantity');
+    qty.value = parseInt(qty.value) + 1;
+}
+function decreaseQty() {
+    var qty = document.getElementById('quantity');
+    if (parseInt(qty.value) > 1) {
+        qty.value = parseInt(qty.value) - 1;
+    }
+}
+</script>
+{% endblock %}

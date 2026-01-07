@@ -1,0 +1,520 @@
+{% extends "admin/base_site.html" %}
+{% load static i18n humanize %}
+
+{% block extrahead %}
+{{ block.super }}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+<div id="dashboard-content">
+    <!-- Date Filter -->
+    <div class="dashboard-filter" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; margin-bottom: 24px; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px;">
+            <div style="flex: 1; min-width: 200px;">
+                <h2 style="color: white; margin: 0; font-size: 24px; font-weight: 600;">
+                    <i class="fas fa-chart-line" style="margin-right: 10px;"></i>
+                    Dashboard Tổng Quan
+                </h2>
+                <p style="color: rgba(255,255,255,0.8); margin: 5px 0 0 0; font-size: 14px;">
+                    Thống kê hệ thống Food Delivery
+                </p>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <label style="color: white; font-weight: 500;">Từ:</label>
+                    <input type="date" id="startDate" style="padding: 10px 14px; border: none; border-radius: 8px; font-size: 14px; background: rgba(255,255,255,0.95); cursor: pointer;">
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <label style="color: white; font-weight: 500;">Đến:</label>
+                    <input type="date" id="endDate" style="padding: 10px 14px; border: none; border-radius: 8px; font-size: 14px; background: rgba(255,255,255,0.95); cursor: pointer;">
+                </div>
+                <button onclick="loadDashboardData()" style="padding: 10px 20px; background: #fff; color: #667eea; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s;">
+                    <i class="fas fa-sync-alt" style="margin-right: 6px;"></i>Cập nhật
+                </button>
+            </div>
+        </div>
+        <!-- Quick date buttons -->
+        <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+            <button onclick="setDateRange(7)" class="quick-date-btn" style="padding: 6px 14px; background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 20px; font-size: 13px; cursor: pointer; transition: all 0.3s;">7 ngày</button>
+            <button onclick="setDateRange(30)" class="quick-date-btn" style="padding: 6px 14px; background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 20px; font-size: 13px; cursor: pointer; transition: all 0.3s;">30 ngày</button>
+            <button onclick="setDateRange(90)" class="quick-date-btn" style="padding: 6px 14px; background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 20px; font-size: 13px; cursor: pointer; transition: all 0.3s;">90 ngày</button>
+            <button onclick="setDateRange(365)" class="quick-date-btn" style="padding: 6px 14px; background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 20px; font-size: 13px; cursor: pointer; transition: all 0.3s;">1 năm</button>
+        </div>
+    </div>
+
+    <!-- Stats Cards Row 1 -->
+    <div class="stats-row" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 24px;">
+        <!-- Total GMV -->
+        <div class="stat-card" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); padding: 24px; border-radius: 16px; color: white; box-shadow: 0 4px 15px rgba(17, 153, 142, 0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <p style="margin: 0; font-size: 14px; opacity: 0.9;">Tổng GMV</p>
+                    <h3 id="total-gmv" style="margin: 8px 0 0 0; font-size: 28px; font-weight: 700;">{{ total_gmv|floatformat:0|intcomma|default:"0" }} ₫</h3>
+                </div>
+                <div style="width: 50px; height: 50px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-coins" style="font-size: 24px;"></i>
+                </div>
+            </div>
+            <p style="margin: 12px 0 0 0; font-size: 13px; opacity: 0.8;">
+                <i class="fas fa-chart-line"></i> Doanh thu đã hoàn thành
+            </p>
+        </div>
+
+        <!-- Total Orders -->
+        <div class="stat-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 24px; border-radius: 16px; color: white; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <p style="margin: 0; font-size: 14px; opacity: 0.9;">Tổng Đơn Hàng</p>
+                    <h3 id="total-orders" style="margin: 8px 0 0 0; font-size: 28px; font-weight: 700;">{{ total_orders|intcomma|default:"0" }}</h3>
+                </div>
+                <div style="width: 50px; height: 50px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-shopping-cart" style="font-size: 24px;"></i>
+                </div>
+            </div>
+            <p style="margin: 12px 0 0 0; font-size: 13px; opacity: 0.8;">
+                <span id="today-orders">{{ today_orders|default:"0" }}</span> đơn hôm nay
+            </p>
+        </div>
+
+        <!-- Total Users -->
+        <div class="stat-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 24px; border-radius: 16px; color: white; box-shadow: 0 4px 15px rgba(240, 147, 251, 0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <p style="margin: 0; font-size: 14px; opacity: 0.9;">Tổng Người Dùng</p>
+                    <h3 id="total-users" style="margin: 8px 0 0 0; font-size: 28px; font-weight: 700;">{{ total_users|intcomma|default:"0" }}</h3>
+                </div>
+                <div style="width: 50px; height: 50px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-users" style="font-size: 24px;"></i>
+                </div>
+            </div>
+            <p style="margin: 12px 0 0 0; font-size: 13px; opacity: 0.8;">
+                <span id="new-users">{{ new_users_today|default:"0" }}</span> người dùng mới hôm nay
+            </p>
+        </div>
+
+        <!-- Total Restaurants -->
+        <div class="stat-card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); padding: 24px; border-radius: 16px; color: white; box-shadow: 0 4px 15px rgba(250, 112, 154, 0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <p style="margin: 0; font-size: 14px; opacity: 0.9;">Nhà Hàng</p>
+                    <h3 id="total-restaurants" style="margin: 8px 0 0 0; font-size: 28px; font-weight: 700;">{{ total_restaurants|intcomma|default:"0" }}</h3>
+                </div>
+                <div style="width: 50px; height: 50px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-store" style="font-size: 24px;"></i>
+                </div>
+            </div>
+            <p style="margin: 12px 0 0 0; font-size: 13px; opacity: 0.8;">
+                <span id="active-restaurants">{{ active_restaurants|default:"0" }}</span> đang hoạt động
+            </p>
+        </div>
+    </div>
+
+    <!-- Stats Cards Row 2 -->
+    <div class="stats-row" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 24px;">
+        <!-- Customers -->
+        <div class="stat-card-small" style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); border-left: 4px solid #11998e;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 40px; height: 40px; background: rgba(17, 153, 142, 0.1); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-user" style="color: #11998e; font-size: 18px;"></i>
+                </div>
+                <div>
+                    <p style="margin: 0; color: #666; font-size: 13px;">Khách hàng</p>
+                    <h4 id="total-customers" style="margin: 4px 0 0 0; font-size: 20px; font-weight: 600; color: #333;">{{ total_customers|default:"0" }}</h4>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sellers -->
+        <div class="stat-card-small" style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); border-left: 4px solid #667eea;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 40px; height: 40px; background: rgba(102, 126, 234, 0.1); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-store-alt" style="color: #667eea; font-size: 18px;"></i>
+                </div>
+                <div>
+                    <p style="margin: 0; color: #666; font-size: 13px;">Người bán</p>
+                    <h4 id="total-sellers" style="margin: 4px 0 0 0; font-size: 20px; font-weight: 600; color: #333;">{{ total_sellers|default:"0" }}</h4>
+                </div>
+            </div>
+        </div>
+
+        <!-- Shippers -->
+        <div class="stat-card-small" style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); border-left: 4px solid #f5576c;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 40px; height: 40px; background: rgba(245, 87, 108, 0.1); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-motorcycle" style="color: #f5576c; font-size: 18px;"></i>
+                </div>
+                <div>
+                    <p style="margin: 0; color: #666; font-size: 13px;">Shipper</p>
+                    <h4 id="total-shippers" style="margin: 4px 0 0 0; font-size: 20px; font-weight: 600; color: #333;">{{ total_shippers|default:"0" }}</h4>
+                </div>
+            </div>
+        </div>
+
+        <!-- Foods -->
+        <div class="stat-card-small" style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); border-left: 4px solid #fa709a;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 40px; height: 40px; background: rgba(250, 112, 154, 0.1); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-utensils" style="color: #fa709a; font-size: 18px;"></i>
+                </div>
+                <div>
+                    <p style="margin: 0; color: #666; font-size: 13px;">Món ăn</p>
+                    <h4 id="total-foods" style="margin: 4px 0 0 0; font-size: 20px; font-weight: 600; color: #333;">{{ total_foods|default:"0" }}</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="charts-row" style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-bottom: 24px;">
+        <!-- Revenue Chart -->
+        <div class="chart-card" style="background: white; padding: 24px; border-radius: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.08);">
+            <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: #333;">
+                <i class="fas fa-chart-area" style="color: #667eea; margin-right: 8px;"></i>
+                Doanh Thu & Đơn Hàng
+            </h3>
+            <canvas id="revenueChart" height="300"></canvas>
+        </div>
+
+        <!-- Status Distribution -->
+        <div class="chart-card" style="background: white; padding: 24px; border-radius: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.08);">
+            <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: #333;">
+                <i class="fas fa-chart-pie" style="color: #f5576c; margin-right: 8px;"></i>
+                Trạng Thái Đơn Hàng
+            </h3>
+            <canvas id="statusChart" height="300"></canvas>
+        </div>
+    </div>
+
+    <!-- Top Restaurants & Recent Orders -->
+    <div class="bottom-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+        <!-- Top Restaurants -->
+        <div class="list-card" style="background: white; padding: 24px; border-radius: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.08);">
+            <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: #333;">
+                <i class="fas fa-trophy" style="color: #fee140; margin-right: 8px;"></i>
+                Top Nhà Hàng
+            </h3>
+            <div id="top-restaurants-list">
+                {% for restaurant in top_restaurants %}
+                <div style="display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid #f0f0f0;">
+                    <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; margin-right: 12px;">
+                        {{ forloop.counter }}
+                    </div>
+                    <div style="flex: 1;">
+                        <p style="margin: 0; font-weight: 500; color: #333;">{{ restaurant.restaurant__name }}</p>
+                        <p style="margin: 4px 0 0 0; font-size: 12px; color: #666;">{{ restaurant.order_count }} đơn hàng</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <p style="margin: 0; font-weight: 600; color: #11998e;">{{ restaurant.revenue|floatformat:0 }} ₫</p>
+                    </div>
+                </div>
+                {% empty %}
+                <p style="color: #666; text-align: center; padding: 20px;">Chưa có dữ liệu</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Quick Links -->
+        <div class="list-card" style="background: white; padding: 24px; border-radius: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.08);">
+            <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600; color: #333;">
+                <i class="fas fa-bolt" style="color: #667eea; margin-right: 8px;"></i>
+                Truy Cập Nhanh
+            </h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <a href="/admin/orders/order/" style="display: flex; align-items: center; padding: 16px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; color: white; text-decoration: none; transition: transform 0.3s;">
+                    <i class="fas fa-shopping-bag" style="font-size: 20px; margin-right: 12px;"></i>
+                    <span>Quản lý đơn hàng</span>
+                </a>
+                <a href="/admin/restaurants/restaurant/" style="display: flex; align-items: center; padding: 16px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); border-radius: 12px; color: white; text-decoration: none; transition: transform 0.3s;">
+                    <i class="fas fa-store" style="font-size: 20px; margin-right: 12px;"></i>
+                    <span>Quản lý nhà hàng</span>
+                </a>
+                <a href="/admin/accounts/user/" style="display: flex; align-items: center; padding: 16px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); border-radius: 12px; color: white; text-decoration: none; transition: transform 0.3s;">
+                    <i class="fas fa-users" style="font-size: 20px; margin-right: 12px;"></i>
+                    <span>Quản lý người dùng</span>
+                </a>
+                <a href="/admin/payments/payment/" style="display: flex; align-items: center; padding: 16px; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); border-radius: 12px; color: white; text-decoration: none; transition: transform 0.3s;">
+                    <i class="fas fa-credit-card" style="font-size: 20px; margin-right: 12px;"></i>
+                    <span>Quản lý thanh toán</span>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Initial chart data from Django context (already JSON serialized)
+let chartLabels = JSON.parse('{{ chart_labels|safe|default:"[]" }}');
+let chartRevenue = JSON.parse('{{ chart_revenue|safe|default:"[]" }}');
+let chartOrders = JSON.parse('{{ chart_orders|safe|default:"[]" }}');
+let statusDistribution = JSON.parse('{{ status_distribution|safe|default:"[]" }}');
+
+// Chart instances
+let revenueChart, statusChart;
+
+// Format currency
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('vi-VN').format(amount) + ' ₫';
+}
+
+// Status labels
+function getStatusLabel(status) {
+    const labels = {
+        'pending': 'Chờ xác nhận',
+        'confirmed': 'Đã xác nhận',
+        'preparing': 'Đang chuẩn bị',
+        'ready': 'Sẵn sàng',
+        'assigned': 'Đã giao shipper',
+        'picked_up': 'Đã lấy hàng',
+        'delivering': 'Đang giao',
+        'delivered': 'Đã giao',
+        'completed': 'Hoàn thành',
+        'cancelled': 'Đã hủy'
+    };
+    return labels[status] || status;
+}
+
+// Status colors
+function getStatusColor(status) {
+    const colors = {
+        'pending': '#ffc107',
+        'confirmed': '#17a2b8',
+        'preparing': '#6f42c1',
+        'ready': '#20c997',
+        'assigned': '#007bff',
+        'picked_up': '#6610f2',
+        'delivering': '#fd7e14',
+        'delivered': '#28a745',
+        'completed': '#11998e',
+        'cancelled': '#dc3545'
+    };
+    return colors[status] || '#6c757d';
+}
+
+// Initialize charts
+function initCharts() {
+    // Revenue Chart
+    const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+    revenueChart = new Chart(revenueCtx, {
+        type: 'line',
+        data: {
+            labels: chartLabels,
+            datasets: [{
+                label: 'Doanh thu (₫)',
+                data: chartRevenue,
+                borderColor: '#667eea',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                fill: true,
+                tension: 0.4,
+                yAxisID: 'y'
+            }, {
+                label: 'Số đơn',
+                data: chartOrders,
+                borderColor: '#f5576c',
+                backgroundColor: 'rgba(245, 87, 108, 0.1)',
+                fill: false,
+                tension: 0.4,
+                yAxisID: 'y1'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    ticks: {
+                        callback: function(value) {
+                            return formatCurrency(value);
+                        }
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            if (context.datasetIndex === 0) {
+                                return 'Doanh thu: ' + formatCurrency(context.raw);
+                            }
+                            return 'Số đơn: ' + context.raw;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Status Chart
+    const statusCtx = document.getElementById('statusChart').getContext('2d');
+    const statusLabels = statusDistribution.map(item => getStatusLabel(item.status));
+    const statusData = statusDistribution.map(item => item.count);
+    const statusColors = statusDistribution.map(item => getStatusColor(item.status));
+
+    statusChart = new Chart(statusCtx, {
+        type: 'doughnut',
+        data: {
+            labels: statusLabels,
+            datasets: [{
+                data: statusData,
+                backgroundColor: statusColors,
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 15,
+                        usePointStyle: true
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Set date range
+function setDateRange(days) {
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    
+    document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
+    document.getElementById('endDate').value = endDate.toISOString().split('T')[0];
+    
+    loadDashboardData();
+}
+
+// Load dashboard data via AJAX
+async function loadDashboardData() {
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    
+    if (!startDate || !endDate) return;
+    
+    try {
+        const response = await fetch(`/api/admin/overview/?start_date=${startDate}&end_date=${endDate}`, {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
+            }
+        });
+        if (!response.ok) throw new Error('Failed to fetch');
+        
+        const data = await response.json();
+        updateDashboard(data);
+    } catch (error) {
+        console.error('Error loading dashboard data:', error);
+    }
+}
+
+// Update dashboard with new data
+function updateDashboard(data) {
+    // Update stats - API returns nested structure
+    document.getElementById('total-gmv').textContent = formatCurrency(data.gmv?.total || 0);
+    document.getElementById('total-orders').textContent = data.orders?.total || 0;
+    document.getElementById('today-orders').textContent = data.orders?.today?.total || 0;
+    
+    // Calculate total users from customers + sellers + shippers
+    const totalUsers = (data.users?.customers || 0) + (data.users?.sellers || 0) + (data.users?.shippers || 0);
+    document.getElementById('total-users').textContent = totalUsers;
+    document.getElementById('new-users').textContent = data.users?.new_today || 0;
+    
+    document.getElementById('total-restaurants').textContent = data.restaurants?.total || 0;
+    document.getElementById('active-restaurants').textContent = data.restaurants?.active || 0;
+    document.getElementById('total-customers').textContent = data.users?.customers || 0;
+    document.getElementById('total-sellers').textContent = data.users?.sellers || 0;
+    document.getElementById('total-shippers').textContent = data.users?.shippers || 0;
+    document.getElementById('total-foods').textContent = data.foods?.total || 0;
+
+    // Update charts
+    if (revenueChart) {
+        revenueChart.data.labels = data.chart_labels || [];
+        revenueChart.data.datasets[0].data = data.chart_revenue || [];
+        revenueChart.data.datasets[1].data = data.chart_orders || [];
+        revenueChart.update();
+    }
+
+    const statusDist = data.orders?.status_distribution || data.status_distribution;
+    if (statusChart && statusDist) {
+        statusChart.data.labels = statusDist.map(item => getStatusLabel(item.status));
+        statusChart.data.datasets[0].data = statusDist.map(item => item.count);
+        statusChart.data.datasets[0].backgroundColor = statusDist.map(item => getStatusColor(item.status));
+        statusChart.update();
+    }
+
+    // Update top restaurants
+    const topRestaurantsList = document.getElementById('top-restaurants-list');
+    if (topRestaurantsList && data.top_restaurants) {
+        topRestaurantsList.innerHTML = data.top_restaurants.map((restaurant, index) => `
+            <div style="display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid #f0f0f0;">
+                <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; margin-right: 12px;">
+                    ${index + 1}
+                </div>
+                <div style="flex: 1;">
+                    <p style="margin: 0; font-weight: 500; color: #333;">${restaurant.restaurant__name || 'N/A'}</p>
+                    <p style="margin: 4px 0 0 0; font-size: 12px; color: #666;">${restaurant.order_count || 0} đơn hàng</p>
+                </div>
+                <div style="text-align: right;">
+                    <p style="margin: 0; font-weight: 600; color: #11998e;">${formatCurrency(restaurant.revenue || 0)}</p>
+                </div>
+            </div>
+        `).join('') || '<p style="color: #666; text-align: center; padding: 20px;">Chưa có dữ liệu</p>';
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize charts FIRST
+    initCharts();
+    
+    // Then set default date range (30 days) - this will trigger loadDashboardData
+    setDateRange(30);
+});
+</script>
+
+<style>
+#dashboard-content {
+    position: relative;
+}
+.chart-card {
+    position: relative;
+    overflow: hidden;
+}
+.chart-card canvas {
+    max-height: 300px;
+}
+.quick-date-btn:hover {
+    background: rgba(255,255,255,0.4) !important;
+}
+.stat-card:hover, .stat-card-small:hover {
+    transform: translateY(-2px);
+    transition: transform 0.3s;
+}
+a[href]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+</style>
+{% endblock %}

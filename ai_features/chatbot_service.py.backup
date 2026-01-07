@@ -1,0 +1,572 @@
+import json
+import os
+import re
+import random
+import uuid
+import unicodedata
+from typing import Dict, List, Optional, Any, Tuple
+from django.utils import timezone
+from django.db import transaction
+from django.db.models import Q
+from datetime import datetime, timedelta
+import openai
+from django.conf import settings
+
+from .models import ChatIntent, ChatEntity, ChatSession, ChatMessage, UserPreference, FoodRecommendation
+from restaurants.models import Food, Restaurant
+from orders.models import Order, OrderItem
+from wallet.models import Wallet
+
+# Vietnamese character mapping for diacritic removal
+VIETNAMESE_MAP = {
+    'a': 'aàáạảãâầấậẩẫăằắặẳẵ',
+    'e': 'eèéẹẻẽêềếệểễ',
+    'i': 'iìíịỉĩ',
+    'o': 'oòóọỏõôồốộổỗơờớợởỡ',
+    'u': 'uùúụủũưừứựửữ',
+    'y': 'yỳýỵỷỹ',
+    'd': 'dđ',
+}
+
+# Load QA dataset
+QA_DATASET_PATH = os.path.join(os.path.dirname(__file__), 'data', 'qa_dataset.json')
+
+def load_qa_dataset():
+    """Load QA dataset from JSON file"""
+    try:
+        with open(QA_DATASET_PATH, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"Error loading QA dataset: {e}")
+        return []
+
+# Preload QA dataset for faster access
+QA_DATASET = load_qa_dataset()
+
+class FoodOrderingChatbot:
+    """AI-powered food ordering chatbot service"""
+    
+    def __init__(self, user=None, session_id=None):
+        self.user = user
+        # Initialize with None first
+        self.session = None
+        self.context = {}
+        
+        try:
+            self.session = self._get_or_create_session(session_id)
+            self.context = self._initialize_context()
+            # Initialize OpenAI API
+            openai.api_key = settings.OPENAI_API_KEY
+        except Exception as e:
+            print(f"Error initializing chatbot: {str(e)}")
+            # Create a minimal session if initialization fails
+            self.session = ChatSession.objects.create(
+                user=user,
+                session_id=str(uuid.uuid4()),
+                title=f"Chat {timezone.now().strftime('%Y-%m-%d %H:%M')}"
+            )
+            self.context = self._initialize_context()
+    
+    def _get_or_create_session(self, session_id=None) -> ChatSession:
+        """Get or create a chat session with error handling"""
+        try:
+            if session_id:
+                try:
+                    return ChatSession.objects.get(session_id=session_id, user=self.user)
+                except ChatSession.DoesNotExist:
+                    pass
+                    
+            # Create new session
+            session = ChatSession.objects.create(
+                user=self.user,
+                session_id=session_id or str(uuid.uuid4()),
+                title=f"Chat {timezone.now().strftime('%Y-%m-%d %H:%M')}"
+            )
+            return session
+            
+        except Exception as e:
+            print(f"Error in _get_or_create_session: {str(e)}")
+            # Create a minimal session in case of any error
+            return ChatSession.objects.create(
+                user=self.user,
+                session_id=str(uuid.uuid4()),
+                title=f"Chat {timezone.now().strftime('%Y-%m-%d %H:%M')}"
+            )
+    
+    def _initialize_context(self) -> Dict[str, Any]:
+        """Initialize chat context with user data"""
+        context = {
+            'user': {
+                'is_authenticated': self.user.is_authenticated if self.user else False,
+                'preferences': {},
+                'recent_orders': [],
+                'wallet_balance': 0,
+                'cart_items': []
+            },
+            'current_order': {
+                'items': [],
+                'restaurant': None,
+                'delivery_address': None,
+                'payment_method': None
+            },
+            'conversation': {
+                'intent': None,
+                'entities': {},
+                'last_intent': None,
+                'state': 'greeting',  # greeting, taking_order, confirming_order, etc.
+                'pending_actions': []
+            }
+        }
+        
+        if self.user and self.user.is_authenticated:
+            # Load user preferences
+            try:
+                preferences = UserPreference.objects.get(user=self.user)
+                context['user']['preferences'] = {
+                    'dietary_restrictions': preferences.dietary_restrictions,
+                    'favorite_cuisines': preferences.favorite_cuisines,
+                    'disliked_ingredients': preferences.disliked_ingredients,
+                    'budget_range': preferences.budget_range
+                }
+            except UserPreference.DoesNotExist:
+                pass
+                
+            # Load recent orders
+            recent_orders = Order.objects.filter(customer=self.user).order_by('-created_at')[:5]
+            context['user']['recent_orders'] = [
+                {
+                    'id': order.id,
+                    'status': order.status,
+                    'total': str(order.total),
+                    'items': [
+                        {
+                            'food_name': item.food.name,
+                            'quantity': item.quantity,
+                            'price': str(item.price)
+                        } for item in order.items.all()
+                    ]
+                } for order in recent_orders
+            ]
+            
+            # Load wallet balance
+            try:
+                wallet = Wallet.objects.get(user=self.user)
+                context['user']['wallet_balance'] = float(wallet.balance)
+            except Wallet.DoesNotExist:
+                pass
+                
+        return context
+    
+    def process_message(self, message: str) -> Dict[str, Any]:
+        """Process user message and return bot response"""
+        print("\n=== Processing Message ===")
+        print(f"Message: {message}")
+        
+        try:
+            # Ensure session exists robustly
+            if not hasattr(self, 'session') or self.session is None:
+                print("No active session found, creating a new one...")
+                try:
+                    self.session = self._get_or_create_session()
+                    print(f"Created new session: {self.session.session_id}")
+                except Exception as e:
+                    print(f"Error creating session: {str(e)}")
+                    try:
+                        # Try one more time with a simpler session creation
+                        self.session = ChatSession.objects.create(
+                            user=self.user,
+                            session_id=str(uuid.uuid4()),
+                            title=f"Chat {timezone.now().strftime('%Y-%m-%d %H:%M')}"
+                        )
+                        print("Successfully created session with fallback method")
+                    except Exception as fallback_error:
+                        print(f"Fallback session creation failed: {str(fallback_error)}")
+                        return {
+                            'type': 'error',
+                            'text': 'Xin lỗi, không thể khởi tạo phiên làm việc. Vui lòng thử lại sau.',
+                            'suggestions': ['Tải lại trang', 'Liên hệ hỗ trợ'],
+                            'metadata': {
+                                'error': str(fallback_error),
+                                'timestamp': timezone.now().isoformat()
+                            }
+                        }
+            
+            # Ensure we have a valid session
+            if not hasattr(self, 'session') or self.session is None:
+                return {
+                    'type': 'error',
+                    'text': 'Không thể khởi tạo phiên làm việc. Vui lòng thử lại.',
+                    'suggestions': ['Tải lại trang', 'Liên hệ hỗ trợ']
+                }
+                
+            session_id = getattr(self.session, 'session_id', 'UNKNOWN_SESSION')
+            print(f"Using session ID: {session_id}")
+            
+            # Save user message to database
+            try:
+                user_msg = ChatMessage.objects.create(
+                    session=self.session,
+                    message_type='user',
+                    content=message
+                )
+                print(f"User message saved with ID: {user_msg.id}")
+            except Exception as e:
+                print(f"Error saving user message: {str(e)}")
+            
+            # First, try to find a matching QA pair
+            qa_response = self._find_matching_qa(message)
+            if qa_response:
+                print("Found matching QA pair")
+                return qa_response
+            
+            # If no QA match, analyze the message for intent and entities
+            print("No QA match, analyzing message...")
+            try:
+                intent, entities = self._analyze_message(message)
+                print(f"Detected intent: {intent}")
+                print(f"Extracted entities: {entities}")
+                
+                # Add message to context
+                if 'message' not in entities:
+                    entities['message'] = message
+                
+                # Generate response based on intent and entities
+                response = self._generate_response(intent, entities)
+                
+                # Add timestamp and session info
+                if 'metadata' not in response:
+                    response['metadata'] = {}
+                    
+                response['metadata'].update({
+                    'timestamp': timezone.now().isoformat(),
+                    'session_id': str(self.session.session_id) if self.session else None,
+                    'intent': intent,
+                    'entities': entities
+                })
+                
+                print(f"Generated response: {response.get('type', 'unknown')}")
+                return response
+                
+            except Exception as e:
+                error_msg = f"Error in message processing: {str(e)}"
+                print(error_msg)
+                import traceback
+                traceback.print_exc()
+                
+                # Try to provide a helpful fallback response
+                fallback_responses = [
+                    "Xin lỗi, tôi gặp chút khó khăn khi xử lý yêu cầu của bạn.",
+                    "Có vẻ như đã xảy ra lỗi. Bạn có thể thử lại hoặc chọn một tác vụ khác.",
+                    "Tôi chưa hiểu rõ yêu cầu của bạn. Bạn có thể nói rõ hơn được không?"
+                ]
+                
+                return {
+                    'type': 'advice',
+                    'text': random.choice(fallback_responses),
+                    'suggestions': ['Xem thực đơn', 'Đặt món', 'Liên hệ hỗ trợ'],
+                    'metadata': {
+                        'error': str(e),
+                        'timestamp': timezone.now().isoformat(),
+                        'original_message': message
+                    }
+                }
+                
+        except Exception as e:
+            print(f"Unexpected error in process_message: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return {
+                'type': 'advice',
+                'text': 'Xin lỗi, đã xảy ra lỗi không mong muốn. Vui lòng thử lại sau.',
+                'suggestions': ['Tải lại trang', 'Liên hệ hỗ trợ'],
+                'metadata': {
+                    'error': str(e),
+                    'timestamp': timezone.now().isoformat()
+                }
+            }
+    
+    def _find_matching_qa(self, message: str) -> Optional[Dict[str, Any]]:
+        """Find matching question-answer pair from the QA dataset"""
+        message = message.lower().strip()
+        
+        # Common greetings
+        greetings = ['hi', 'hello', 'xin chào', 'chào', 'chào bạn', 'chào bot']
+        if any(greeting in message for greeting in greetings):
+            return {
+                'type': 'advice',
+                'text': self._generate_greeting(),
+                'suggestions': ['Xem thực đơn', 'Đặt món', 'Tìm nhà hàng']
+            }
+            
+        # Check for exact matches first
+        for qa in QA_DATASET:
+            if qa['question'].lower() == message:
+                return qa['response']
+        
+        # Check for partial matches with higher threshold
+        for qa in QA_DATASET:
+            if qa['question'].lower() in message or message in qa['question'].lower():
+                return qa['response']
+                
+        # Check for food order intent
+        if any(word in message for word in ['tôi muốn', 'cho tôi', 'đặt món', 'món', 'ăn', 'uống']):
+            # Extract food item from message
+            food_entities = self._extract_entities(message, 'order_food')
+            if food_entities.get('food_item'):
+                food_name = food_entities['food_item']
+                quantity = food_entities.get('quantity', 1)
+                
+                # Search for food in database
+                food_results = self._search_food_in_database(food_name)
+                if food_results:
+                    return self._show_food_options(food_results, quantity)
+                
+                # If no exact match, try to find similar foods
+                similar_foods = self._find_similar_foods(food_name)
+                if similar_foods:
+                    return {
+                        'type': 'advice',
+                        'text': f"Tôi không tìm thấy món '{food_name}'. Bạn có thể tham khảo các món tương tự dưới đây:",
+                        'suggestions': [food['name'] for food in similar_foods[:3]],
+                        'metadata': {
+                            'similar_foods': similar_foods
+                        }
+                    }
+        
+        return None
+    
+    def _generate_greeting(self) -> str:
+        """Generate appropriate greeting based on time of day"""
+        hour = datetime.now().hour
+        greetings = []
+        
+        if 5 <= hour < 10:
+            greetings.append("Chào buổi sáng!")
+        elif 10 <= hour < 13:
+            greetings.append("Chào buổi trưa!")
+        elif 13 <= hour < 18:
+            greetings.append("Chào buổi chiều!")
+        else:
+            greetings.append("Chào buổi tối!")
+            
+        # Add user's name if available
+        if self.user and hasattr(self.user, 'first_name') and self.user.first_name:
+            greetings.append(f"{self.user.first_name}!")  
+        else:
+            greetings.append("Tôi là trợ lý đặt món ăn.")
+            
+        greetings.append("Tôi có thể giúp gì cho bạn hôm nay?")
+        
+        return " ".join(greetings)
+    
+    def _analyze_message(self, message: str) -> Tuple[str, Dict[str, Any]]:
+        """Analyze user message to detect intent and extract entities"""
+        message = message.lower().strip()
+        
+        # Check for greetings
+        greetings = ['hi', 'hello', 'xin chào', 'chào', 'chào bạn', 'chào bot']
+        if any(greeting in message for greeting in greetings):
+            return 'greeting', {}
+            
+        # Check for food order intent
+        order_keywords = ['tôi muốn', 'cho tôi', 'đặt món', 'món', 'ăn', 'uống', 'gọi món']
+        if any(keyword in message for keyword in order_keywords):
+            entities = self._extract_entities(message, 'order_food')
+            if entities.get('food_item'):
+                return 'order_food', entities
+                
+        # Check for menu query
+        menu_keywords = ['thực đơn', 'menu', 'có món gì', 'món ngon', 'đồ ăn']
+        if any(keyword in message for keyword in menu_keywords):
+            return 'ask_menu', {'category': 'all'}
+        
+        # Check for exact matches in QA dataset
+        for qa in QA_DATASET:
+            if qa['question'].lower() in message:
+                self.context['last_qa_match'] = qa
+                return 'qa_response', {}
+        
+        # If no specific intent detected, try to match keywords
+        intent = self._match_intent(message)
+        
+        # If intent is still unknown, use AI to classify
+        if intent == 'unknown':
+            intent = self._classify_intent_with_ai(message)
+        
+        # Extract entities based on detected intent
+        entities = self._extract_entities(message, intent)
+        
+        # Update conversation context
+        self.context['conversation']['last_intent'] = intent
+        self.context['conversation']['entities'] = entities
+        
+        return intent, entities
+    
+    def _generate_response(self, intent: str, entities: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate appropriate response based on intent and context"""
+        try:
+            if intent == 'greeting':
+                return {
+                    'type': 'advice',
+                    'text': self._generate_greeting(),
+                    'suggestions': ['Xem thực đơn', 'Đặt món', 'Tìm nhà hàng']
+                }
+                
+            elif intent == 'order_food':
+                food_name = entities.get('food_item')
+                quantity = entities.get('quantity', 1)
+                
+                if not food_name:
+                    return {
+                        'type': 'advice',
+                        'text': 'Bạn muốn đặt món gì ạ?',
+                        'suggestions': ['Phở bò', 'Bún chả', 'Cơm gà']
+                    }
+                
+                # Search for food in database
+                food_results = self._search_food_in_database(food_name)
+                
+                if food_results:
+                    return self._show_food_options(food_results, quantity)
+                else:
+                    # Try to find similar foods
+                    similar_foods = self._find_similar_foods(food_name)
+                    if similar_foods:
+                        return {
+                            'type': 'advice',
+                            'text': f"Tôi không tìm thấy món '{food_name}'. Bạn có thể tham khảo các món tương tự dưới đây:",
+                            'suggestions': [food['name'] for food in similar_foods[:3]],
+                            'metadata': {
+                                'similar_foods': similar_foods
+                            }
+                        }
+                    else:
+                        return {
+                            'type': 'advice',
+                            'text': f"Xin lỗi, hiện tại chúng tôi chưa phục vụ món '{food_name}'. Bạn muốn thử món khác không?",
+                            'suggestions': ['Xem thực đơn', 'Món phổ biến', 'Liên hệ hỗ trợ']
+                        }
+                        
+            elif intent == 'ask_menu':
+                category = entities.get('category', 'all')
+                popular_foods = self._get_popular_foods(limit=5)
+                
+                if popular_foods:
+                    food_list = "\n".join([f"- {food['name']}: {food['price']}đ" for food in popular_foods])
+                    return {
+                        'type': 'advice',
+                        'text': f"Dưới đây là một số món ngon hiện có:\n{food_list}",
+                        'suggestions': [food['name'] for food in popular_foods[:3]]
+                    }
+                else:
+                    return {
+                        'type': 'advice',
+                        'text': 'Xin lỗi, hiện không có món nào trong thực đơn. Vui lòng quay lại sau.',
+                        'suggestions': ['Liên hệ hỗ trợ']
+                    }
+                    
+            # Default response for unknown intents
+            return {
+                'type': 'advice',
+                'text': 'Xin lỗi, tôi chưa hiểu ý của bạn. Bạn có thể nói rõ hơn được không?',
+                'suggestions': ['Xem thực đơn', 'Đặt món', 'Liên hệ hỗ trợ']
+            }
+            
+        except Exception as e:
+            print(f"Error in _generate_response: {str(e)}")
+            return {
+                'type': 'advice',
+                'text': 'Xin lỗi, đã xảy ra lỗi khi xử lý yêu cầu của bạn. Vui lòng thử lại sau.',
+                'suggestions': ['Tải lại trang', 'Liên hệ hỗ trợ']
+            }
+    
+    def _get_popular_foods(self, limit: int = 5) -> List[Dict]:
+        """Get list of popular food items"""
+        try:
+            popular_foods = Food.objects.filter(is_available=True).order_by('-order_count')[:limit]
+            return [{
+                'id': food.id,
+                'name': food.name,
+                'price': food.price,
+                'description': food.description,
+                'image': food.image.url if food.image else None
+            } for food in popular_foods]
+        except Exception as e:
+            print(f"Error getting popular foods: {str(e)}")
+            return []
+
+# Example usage:
+# chatbot = FoodOrderingChatbot(user=request.user)
+# response = chatbot.process_message("Tôi muốn đặt 1 phở bò")
+# print(response['text'])
+
+# Common Vietnamese stopwords
+VIETNAMESE_STOPWORDS = {
+    'và', 'của', 'cho', 'với', 'có', 'không', 'tôi', 'bạn', 'này', 'đó', 'kia',
+    'nào', 'về', 'nhưng', 'mà', 'thì', 'là', 'ở', 'tại', 'vào', 'lên', 'xuống',
+    'ra', 'vào', 'lại', 'đã', 'đang', 'sẽ', 'bị', 'được', 'cũng', 'vẫn', 'đều',
+    'rất', 'quá', 'lắm', 'hơn', 'nhất', 'mấy', 'nhiều', 'ít', 'một', 'hai', 'ba',
+    'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín', 'mười', 'một số', 'một ít', 'một chút',
+    'một ít nữa', 'một chút nữa', 'nhiều hơn', 'ít hơn', 'tất cả', 'mỗi', 'mọi',
+    'từng', 'những', 'các', 'ai', 'gì', 'nào', 'sao', 'đâu', 'bao giờ', 'bao lâu',
+    'tại sao', 'thế nào', 'bằng cách nào', 'vì sao', 'vì vậy', 'do đó', 'cho nên',
+    'tuy nhiên', 'như vậy', 'như thế', 'thế là', 'có lẽ', 'có thể', 'chắc chắn',
+    'chắc hẳn', 'có lẽ là', 'có thể là', 'chắc chắn là', 'chắc hẳn là', 'tôi muốn',
+    'tôi cần', 'tôi thích', 'tôi đang', 'tôi sẽ', 'tôi đã', 'tôi vừa', 'tôi mới',
+    'tôi đã từng', 'tôi chưa', 'tôi không', 'tôi có', 'tôi không có', 'tôi có thể',
+    'tôi không thể', 'tôi phải', 'tôi nên', 'tôi cần phải', 'tôi muốn đặt',
+    'tôi muốn mua', 'tôi muốn tìm', 'tôi muốn biết', 'tôi muốn hỏi', 'tôi muốn xem',
+    'cho tôi', 'giúp tôi', 'chỉ tôi', 'hỏi tôi', 'nói tôi', 'bảo tôi', 'nhờ tôi',
+    'nhắc tôi', 'nhắn tôi', 'gọi tôi', 'gửi tôi', 'đưa tôi', 'lấy cho tôi',
+    'đem cho tôi', 'mang cho tôi', 'đưa cho tôi', 'lấy giúp tôi', 'đem giúp tôi',
+    'mang giúp tôi', 'đưa giúp tôi', 'làm ơn', 'xin lỗi', 'cảm ơn', 'xin chào',
+    'tạm biệt', 'chào mừng', 'chào đón', 'kính chào', 'thân ái', 'trân trọng',
+    'kính thưa', 'thưa ông', 'thưa bà', 'thưa anh', 'thưa chị', 'thưa em',
+    'thưa cô', 'thưa chú', 'thưa bác', 'thưa cụ', 'thưa ngài', 'thưa quý vị',
+    'thưa các bạn', 'các anh chị', 'các bạn', 'mọi người', 'tất cả mọi người',
+    'tất cả các bạn', 'tất cả mọi người có mặt', 'tất cả các bạn có mặt',
+    'tất cả mọi người ở đây', 'tất cả các bạn ở đây', 'tất cả mọi người trong phòng',
+    'tất cả các bạn trong phòng', 'tất cả mọi người tham dự', 'tất cả các bạn tham dự',
+    'tất cả mọi người tham gia', 'tất cả các bạn tham gia', 'tất cả mọi người có mặt hôm nay',
+    'tất cả các bạn có mặt hôm nay', 'tất cả mọi người tham dự hôm nay',
+    'tất cả các bạn tham dự hôm nay', 'tất cả mọi người tham gia hôm nay',
+    'tất cả các bạn tham gia hôm nay', 'tất cả mọi người có mặt tại đây',
+    'tất cả các bạn có mặt tại đây', 'tất cả mọi người tham dự tại đây',
+    'tất cả các bạn tham dự tại đây', 'tất cả mọi người tham gia tại đây',
+    'tất cả các bạn tham gia tại đây', 'tất cả mọi người có mặt trong phòng',
+    'tất cả các bạn có mặt trong phòng', 'tất cả mọi người tham dự trong phòng',
+    'tất cả các bạn tham dự trong phòng', 'tất cả mọi người tham gia trong phòng',
+    'tất cả các bạn tham gia trong phòng', 'tất cả mọi người có mặt tham dự',
+    'tất cả các bạn có mặt tham dự', 'tất cả mọi người có mặt tham gia',
+    'tất cả các bạn có mặt tham gia', 'tất cả mọi người tham dự có mặt',
+    'tất cả các bạn tham dự có mặt', 'tất cả mọi người tham gia có mặt',
+    'tất cả các bạn tham gia có mặt', 'tất cả mọi người có mặt tham dự hôm nay',
+    'tất cả các bạn có mặt tham dự hôm nay', 'tất cả mọi người có mặt tham gia hôm nay',
+    'tất cả các bạn có mặt tham gia hôm nay', 'tất cả mọi người tham dự có mặt hôm nay',
+    'tất cả các bạn tham dự có mặt hôm nay', 'tất cả mọi người tham gia có mặt hôm nay',
+    'tất cả các bạn tham gia có mặt hôm nay', 'tất cả mọi người có mặt tham dự tại đây',
+    'tất cả các bạn có mặt tham dự tại đây', 'tất cả mọi người có mặt tham gia tại đây',
+    'tất cả các bạn có mặt tham gia tại đây', 'tất cả mọi người tham dự có mặt tại đây',
+    'tất cả các bạn tham dự có mặt tại đây', 'tất cả mọi người tham gia có mặt tại đây',
+    'tất cả các bạn tham gia có mặt tại đây', 'tất cả mọi người có mặt tham dự trong phòng',
+    'tất cả các bạn có mặt tham dự trong phòng', 'tất cả mọi người có mặt tham gia trong phòng',
+    'tất cả các bạn có mặt tham gia trong phòng', 'tất cả mọi người tham dự có mặt trong phòng',
+    'tất cả các bạn tham dự có mặt trong phòng', 'tất cả mọi người tham gia có mặt trong phòng',
+    'tất cả các bạn tham gia có mặt trong phòng', 'tất cả mọi người có mặt tham dự hôm nay tại đây',
+    'tất cả các bạn có mặt tham dự hôm nay tại đây', 'tất cả mọi người có mặt tham gia hôm nay tại đây',
+    'tất cả các bạn có mặt tham gia hôm nay tại đây', 'tất cả mọi người tham dự có mặt hôm nay tại đây',
+    'tất cả các bạn tham dự có mặt hôm nay tại đây', 'tất cả mọi người tham gia có mặt hôm nay tại đây',
+    'tất cả các bạn tham gia có mặt hôm nay tại đây', 'tất cả mọi người có mặt tham dự hôm nay trong phòng',
+    'tất cả các bạn có mặt tham dự hôm nay trong phòng', 'tất cả mọi người có mặt tham gia hôm nay trong phòng',
+    'tất cả các bạn có mặt tham gia hôm nay trong phòng', 'tất cả mọi người tham dự có mặt hôm nay trong phòng',
+    'tất cả các bạn tham dự có mặt hôm nay trong phòng', 'tất cả mọi người tham gia có mặt hôm nay trong phòng',
+    'tất cả các bạn tham gia có mặt hôm nay trong phòng', 'tất cả mọi người có mặt tham dự tại đây trong phòng',
+    'tất cả các bạn có mặt tham dự tại đây trong phòng', 'tất cả mọi người có mặt tham gia tại đây trong phòng',
+    'tất cả các bạn có mặt tham gia tại đây trong phòng', 'tất cả mọi người tham dự có mặt tại đây trong phòng',
+    'tất cả các bạn tham dự có mặt tại đây trong phòng', 'tất cả mọi người tham gia có mặt tại đây trong phòng',
+    'tất cả các bạn tham gia có mặt tại đây trong phòng', 'tất cả mọi người có mặt tham dự hôm nay tại đây trong phòng',
+    'tất cả các bạn có mặt tham dự hôm nay tại đây trong phòng', 'tất cả mọi người có mặt tham gia hôm nay tại đây trong phòng',
+    'tất cả các bạn có mặt tham gia hôm nay tại đây trong phòng', 'tất cả mọi người tham dự có mặt hôm nay tại đây trong phòng',
+    'tất cả các bạn tham dự có mặt hôm nay tại đây trong phòng', 'tất cả mọi người tham gia có mặt hôm nay tại đây trong phòng',
+    'tất cả các bạn tham gia có mặt hôm nay tại đây trong phòng'
+}

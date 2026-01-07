@@ -1,0 +1,120 @@
+[
+  {
+    "question": "hôm nay ăn gì ngon",
+    "response": {
+      "type": "advice",
+      "text": "Bạn có thể thử phở bò hoặc bún chả, rất hợp khẩu vị.",
+      "suggestions": ["Xem thực đơn", "Đặt món ngay", "Xem nhà hàng gần đây"]
+    }
+  },
+  {
+    "question": "quán nào bán pizza",
+    "response": {
+      "type": "advice",
+      "text": "Gợi ý: Pizza Hut hoặc Domino's đều ngon và có nhiều chi nhánh.",
+      "suggestions": ["Xem địa chỉ gần nhất", "Đặt pizza", "Xem thực đơn"]
+    }
+  },
+  {
+    "question": "tôi muốn ăn gà rán",
+    "response": {
+      "type": "action",
+      "action": "get_food",
+      "data": {
+        "food_type": "gà rán",
+        "suggested_restaurants": ["KFC", "Lotteria", "Jollibee"]
+      },
+      "metadata": {
+        "intent": "find_food",
+        "requires_confirmation": true
+      }
+    }
+  },
+  {
+    "question": "đặt bánh mì thịt",
+    "response": {
+      "type": "action",
+      "action": "order_food",
+      "data": {
+        "food_item": "Bánh mì thịt",
+        "quantity": 1,
+        "options": ["Thêm pate", "Thêm ớt", "Không ngò"]
+      },
+      "metadata": {
+        "intent": "order_food",
+        "requires_confirmation": true
+      }
+    }
+  },
+  {
+    "question": "có món chay nào không",
+    "response": {
+      "type": "advice",
+      "text": "Chúng tôi có nhiều món chay ngon như đậu hũ chiên sả ớt, bún chay, cơm chay...",
+      "suggestions": ["Xem thực đơn chay", "Đặt món chay", "Tìm nhà hàng chay"]
+    }
+  },
+  {
+    "question": "đặt 2 phần cơm gà",
+    "response": {
+      "type": "action",
+      "action": "order_food",
+      "data": {
+        "food_item": "Cơm gà",
+        "quantity": 2,
+        "options": ["Đùi hoặc ức", "Thêm nước mắm", "Thêm rau sống"]
+      },
+      "metadata": {
+        "intent": "order_food",
+        "requires_confirmation": true
+      }
+    }
+  },
+  {
+    "question": "giờ mở cửa",
+    "response": {
+      "type": "advice",
+      "text": "Chúng tôi phục vụ từ 7:00 sáng đến 10:00 tối tất cả các ngày trong tuần.",
+      "suggestions": ["Đặt bàn", "Xem thực đơn", "Liên hệ hỗ trợ"]
+    }
+  },
+  {
+    "question": "tôi muốn tìm quán cà phê",
+    "response": {
+      "type": "action",
+      "action": "find_place",
+      "data": {
+        "place_type": "quán cà phê",
+        "suggested_locations": ["Highlands", "The Coffee House", "Starbucks"]
+      },
+      "metadata": {
+        "intent": "find_place",
+        "requires_confirmation": false
+      }
+    }
+  },
+  {
+    "question": "có giao hàng tận nơi không",
+    "response": {
+      "type": "advice",
+      "text": "Có ạ, chúng tôi có dịch vụ giao hàng tận nơi trong phạm vi 10km.",
+      "suggestions": ["Xem phí vận chuyển", "Đặt giao hàng", "Xem khu vực giao hàng"]
+    }
+  },
+  {
+    "question": "đặt bàn cho 4 người tối nay",
+    "response": {
+      "type": "action",
+      "action": "book_table",
+      "data": {
+        "number_of_people": 4,
+        "time": "tối nay",
+        "special_requests": ["Bàn gần cửa sổ", "Chỗ để xe hơi"]
+      },
+      "metadata": {
+        "intent": "book_table",
+        "requires_confirmation": true
+      }
+    }
+  }
+]
