@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { Alert } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import API from "../api/axiosInstance";
+import { authAPI } from "../services/api";
 
 const AuthContext = createContext();
 
@@ -203,88 +204,32 @@ export const AuthProvider = ({ children }) => {
       // If avatarUri exists and it's a local file -> use multipart form
       if (payload?.avatarUri && (payload.avatarUri.startsWith('file://') || !payload.avatarUri.startsWith('http'))) {
         console.log('Preparing file upload with avatar')
-        
-        // Create form data
+
         const formData = new FormData()
-        
-        // Add all non-avatar fields to form data
-        console.log('Adding form fields:')
+
         Object.entries(payload).forEach(([key, value]) => {
           if (key !== 'avatarUri' && value !== undefined && value !== null) {
             const val = typeof value === 'object' ? JSON.stringify(value) : String(value)
-            console.log(`- ${key}:`, val)
             formData.append(key, val)
           }
         })
 
-        // Handle avatar file upload
         const uri = payload.avatarUri
-        const filename = uri.split('/').pop()
+        const filename = uri.split('/').pop() || `avatar_${Date.now()}.jpg`
         const match = /\.(\w+)$/.exec(filename)
-        const type = match ? `image/${match[1]}` : 'image/jpeg'
-        
-        const fileObj = {
+        const ext = match ? match[1] : 'jpg'
+        const type = match ? `image/${ext}` : 'image/jpeg'
+
+        formData.append('avatar', {
           uri,
-          name: `avatar_${Date.now()}.${match ? match[1] : 'jpg'}`,
+          name: `avatar_${Date.now()}.${ext}`,
           type,
-        }
-        
-        console.log('Adding file to form:', fileObj)
-        formData.append('avatar', fileObj)
+        })
 
-        // Log form data for debugging
-        console.log('FormData entries:')
-        if (formData._parts) {
-          formData._parts.forEach(([key, value]) => {
-            console.log(`- ${key}:`, value)
-          })
-        }
-
-        // Create a new XMLHttpRequest for better control over the upload
-        const uploadWithXHR = async () => {
-          const token = await AsyncStorage.getItem('accessToken');
-          return new Promise((resolve, reject) => {
-            const xhr = new XMLHttpRequest()
-            xhr.open('PUT', API.defaults.baseURL + 'auth/profile/')
-            xhr.setRequestHeader('Accept', 'application/json')
-            xhr.setRequestHeader('Authorization', `Bearer ${token}`)
-            
-            xhr.onload = () => {
-              if (xhr.status >= 200 && xhr.status < 300) {
-                try {
-                  resolve(JSON.parse(xhr.response))
-                } catch (e) {
-                  resolve(xhr.response)
-                }
-              } else {
-                reject(new Error(`Request failed with status ${xhr.status}`))
-              }
-            }
-            
-            xhr.onerror = () => reject(new Error('Network Error'))
-            xhr.ontimeout = () => reject(new Error('Request timeout'))
-            
-            // Send FormData directly
-            xhr.send(formData)
-          })
-        }
-
-        console.log('Sending multipart form data with avatar')
-        try {
-          // First try with XMLHttpRequest
-          const response = await uploadWithXHR()
-          res = { data: response }
-        } catch (xhrError) {
-          console.warn('XHR upload failed, falling back to axios:', xhrError)
-          // Fallback to axios if XHR fails
-          res = await API.put('/auth/profile/', formData, {
-            headers: {
-              'Content-Type': 'multipart/form-data',
-              'Accept': 'application/json',
-            },
-            transformRequest: () => formData,
-          })
-        }
+        // IMPORTANT: do NOT manually set multipart Content-Type in React Native.
+        // Let axios set the boundary; setting it manually often causes "Network Error".
+        // Use authAPI instead of API to avoid interceptor conflicts
+        res = await authAPI.updateProfile(formData)
       } else {
         // Regular JSON update (no file upload)
         const { avatarUri, ...updateData } = payload

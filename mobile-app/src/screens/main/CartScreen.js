@@ -20,16 +20,16 @@ export default function CartScreen({ navigation }) {
       navigation.navigate('Checkout', { from: 'Cart', total: getCartTotal() })
     } else {
       Alert.alert(
-        "Chọn cách đặt hàng",
-        "Bạn có thể đăng nhập hoặc đặt hàng không cần tài khoản",
+        "Yêu cầu đăng nhập",
+        "Bạn cần đăng nhập để thanh toán đơn hàng. Giỏ hàng của bạn sẽ được giữ lại sau khi đăng nhập.",
         [
           {
-            text: "Đặt hàng không đăng nhập",
-            onPress: () => navigation.navigate("GuestCheckout"),
+            text: "Đăng nhập",
+            onPress: () => navigation.navigate("Login", { returnTo: "Cart" }),
           },
           {
-            text: "Đăng nhập",
-            onPress: () => navigation.navigate("Login"),
+            text: "Đăng ký tài khoản",
+            onPress: () => navigation.navigate("Register", { returnTo: "Cart" }),
           },
           {
             text: "Hủy",

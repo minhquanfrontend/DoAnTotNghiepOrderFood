@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { View, Text, StyleSheet, Alert, TouchableOpacity, ScrollView, Switch } from "react-native"
-import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from "react-native-maps"
+import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps"
 import * as Location from "expo-location"
 import { Ionicons } from "@expo/vector-icons"
 import { theme } from "../../theme/theme"
@@ -215,16 +215,6 @@ const ShipperTrackingScreen = ({ navigation }) => {
               pinColor={theme.colors.success}
             />
 
-            {routePoints.length > 0 && (
-              <Polyline
-                coordinates={routePoints.map((point) => ({
-                  latitude: Number.parseFloat(point.latitude),
-                  longitude: Number.parseFloat(point.longitude),
-                }))}
-                strokeColor={theme.colors.primary}
-                strokeWidth={3}
-              />
-            )}
           </>
         )}
       </MapView>

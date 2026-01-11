@@ -6,7 +6,8 @@ import { TextInput, Button, Card, IconButton } from "react-native-paper"
 import { useAuth } from "../../context/AuthContext"
 import { colors, spacing } from "../../theme/theme"
 
-export default function RegisterScreen({ navigation }) {
+export default function RegisterScreen({ navigation, route }) {
+  const returnTo = route?.params?.returnTo
   const [formData, setFormData] = useState({
     username: "",
     email: "",
@@ -74,6 +75,10 @@ export default function RegisterScreen({ navigation }) {
       const loginResult = await login(formData.username, formData.password)
       if (loginResult.success) {
         // login thành công: AuthContext sẽ cập nhật state và AppContent sẽ tự chuyển
+        // Nếu có returnTo (từ Cart), navigate về đó để tiếp tục thanh toán
+        if (returnTo) {
+          navigation.navigate(returnTo)
+        }
       } else {
         Alert.alert("Đăng ký thành công", "Tự động đăng nhập thất bại. Vui lòng đăng nhập lại.")
       }
@@ -202,7 +207,7 @@ export default function RegisterScreen({ navigation }) {
 
         <View style={styles.loginContainer}>
           <Text style={styles.loginText}>Đã có tài khoản? </Text>
-          <Button mode="text" onPress={() => navigation.navigate("Login")} textColor={colors.primary} compact>
+          <Button mode="text" onPress={() => navigation.navigate("Login", { returnTo })} textColor={colors.primary} compact>
             Đăng nhập ngay
           </Button>
         </View>

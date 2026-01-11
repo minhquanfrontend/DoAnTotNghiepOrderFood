@@ -12,6 +12,8 @@ urlpatterns = [
     path('methods/', views.PaymentMethodListView.as_view(), name='payment_methods'),
     path('methods/<int:pk>/', views.PaymentMethodDetailView.as_view(), name='payment_method_detail'),
     
-    # VNPay callback only
+    # Payment callbacks
     path('callback/vnpay/', views.vnpay_callback, name='vnpay_callback'),
+    path('callback/paypal/', views.paypal_callback, name='paypal_callback'),
+    path('paypal/capture/', views.paypal_capture, name='paypal_capture'),
 ]

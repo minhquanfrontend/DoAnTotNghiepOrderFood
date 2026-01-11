@@ -19,6 +19,7 @@ from .serializers import (
     ChatSessionSerializer, ChatMessageSerializer, SendMessageSerializer
 )
 from restaurants.models import Food, Restaurant
+from restaurants.serializers import FoodSerializer
 from orders.models import Order, OrderItem
 from django.utils import timezone
 from .chatbot_service import FoodOrderingChatbot
@@ -36,7 +37,29 @@ class UserPreferenceView(generics.RetrieveUpdateAPIView):
 
 class RecommendationListView(generics.ListAPIView):
     serializer_class = FoodRecommendationSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            trending = self.trending_recommendations()
+            foods = Food.objects.filter(id__in=[r['food_id'] for r in trending], is_available=True)
+            food_map = {f.id: f for f in foods}
+            results = []
+            for r in trending:
+                food_id = r.get('food_id')
+                food_obj = food_map.get(food_id)
+                if not food_obj:
+                    continue
+                results.append({
+                    'id': food_id,
+                    'food': FoodSerializer(food_obj, context={'request': request}).data,
+                    'reason': r.get('reason') or 'Gợi ý phổ biến',
+                    'score': r.get('score', 0),
+                    'recommendation_type': r.get('type') or 'trending',
+                })
+            return Response({'results': results}, status=status.HTTP_200_OK)
+
+        return super().list(request, *args, **kwargs)
     
     def get_queryset(self):
         # Generate recommendations if not exist or outdated

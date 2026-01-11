@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     'ai_features',
     'home',
     'admin_dashboard',
+    'notifications',
 ]
 
 MIDDLEWARE = [
@@ -342,5 +343,11 @@ ZALOPAY_KEY2 = 'your_key2'
 BANK_ID = '970422'
 BANK_ACCOUNT_NO = '0123456789'
 BANK_ACCOUNT_NAME = 'FOOD DELIVERY SYSTEM'
+
+# PayPal Configuration
+# Get credentials from: https://developer.paypal.com/dashboard/applications/sandbox
+PAYPAL_CLIENT_ID = config('PAYPAL_CLIENT_ID', default='')
+PAYPAL_CLIENT_SECRET = config('PAYPAL_CLIENT_SECRET', default='')
+PAYPAL_SANDBOX = config('PAYPAL_SANDBOX', default=True, cast=bool)  # True for sandbox, False for live
 
 FRONTEND_URL = 'http://localhost:3000'

@@ -18,9 +18,59 @@ const api = axios.create({
 
 // Base URL is selected from env/app.json or emulator defaults.
 
+// ================== PUBLIC ENDPOINTS (NO AUTH) ==================
+const isPublicEndpoint = (url = "") => {
+  try {
+    const path = String(url || "").split("?")[0]
+
+    // Private endpoints must be checked first because many live under "/restaurants/".
+    const privatePaths = [
+      "/restaurants/my-restaurant/",
+      "/restaurants/my-foods/",
+      "/restaurants/my-promotions/",
+      "/orders/cart/",
+      "/orders/my-orders/",
+      "/orders/restaurant/",
+      "/auth/profile/",
+      "/auth/logout/",
+    ]
+    if (privatePaths.some((p) => path.startsWith(p))) return false
+
+    const publicPaths = [
+      "/auth/login/",
+      "/auth/register/",
+      "/auth/token/refresh/",
+      "/auth/token/verify/",
+      "/restaurants/banners/",
+      "/restaurants/categories/",
+      "/restaurants/categories-with-foods/",
+      "/restaurants/foods/",
+      "/ai/recommendations/",
+    ]
+
+    if (publicPaths.some((p) => path.startsWith(p))) return true
+
+    // Public restaurant list/detail endpoints
+    if (path === "/restaurants/" || path === "/restaurants") return true
+    if (/^\/restaurants\/\d+\/?$/.test(path)) return true
+    if (/^\/restaurants\/\d+\/foods\/?$/.test(path)) return true
+
+    return false
+  } catch {
+    return false
+  }
+}
+
 // ================== REQUEST INTERCEPTOR ==================
 api.interceptors.request.use(
   async (config) => {
+    const url = config?.url || ""
+    if (isPublicEndpoint(url)) {
+      config.headers = config.headers || {}
+      delete config.headers.Authorization
+      delete config.headers.authorization
+      return config
+    }
     // Support both key names to be compatible with different parts of app
     const token = (await AsyncStorage.getItem("accessToken")) || (await AsyncStorage.getItem("access_token"))
     if (token) {
@@ -40,7 +90,14 @@ api.interceptors.response.use(
     if (!error.response) {
       return Promise.reject(error);
     }
-    if (error.response?.status === 401 && !originalRequest._retry) {
+
+    // Backend may return 403 with {code: 'token_not_valid'} when token is expired/invalid.
+    const isTokenNotValid403 =
+      error.response?.status === 403 &&
+      (error.response?.data?.code === 'token_not_valid' ||
+        Array.isArray(error.response?.data?.messages))
+
+    if ((error.response?.status === 401 || isTokenNotValid403) && !originalRequest._retry) {
       originalRequest._retry = true
       try {
         // Try both refresh token key variants
@@ -64,6 +121,17 @@ api.interceptors.response.use(
         await AsyncStorage.removeItem("access_token")
         await AsyncStorage.removeItem("refreshToken")
         await AsyncStorage.removeItem("refresh_token")
+        try { delete api.defaults.headers.common.Authorization } catch {}
+
+        // If this was a public endpoint, retry once without auth.
+        const url = originalRequest?.url || ""
+        if (isPublicEndpoint(url) && !originalRequest._noAuthRetry) {
+          originalRequest._noAuthRetry = true
+          originalRequest.headers = originalRequest.headers || {}
+          delete originalRequest.headers.Authorization
+          delete originalRequest.headers.authorization
+          return api(originalRequest)
+        }
       }
     }
     return Promise.reject(error)
@@ -74,8 +142,13 @@ api.interceptors.response.use(
 export const authAPI = {
   login: async (username, password) => {
     try {
-      const response = await api.post("/auth/login/", { username, password });
-      const { access, refresh } = response.data;
+      // NOTE: our axios response interceptor returns response.data already.
+      const data = await api.post("/auth/login/", { username, password });
+      const access = data?.tokens?.access || data?.access
+      const refresh = data?.tokens?.refresh || data?.refresh
+      if (!access || !refresh) {
+        throw new Error("Login response missing access/refresh token")
+      }
       
       // Save tokens to AsyncStorage with both key variants for compatibility
       await AsyncStorage.multiSet([
@@ -88,7 +161,7 @@ export const authAPI = {
       // Set default auth header for future requests
       api.defaults.headers.common['Authorization'] = `Bearer ${access}`;
       
-      return response.data;
+      return data;
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -96,7 +169,19 @@ export const authAPI = {
   },
   register: (userData) => api.post("/auth/register/", userData),
   getProfile: () => api.get("/auth/profile/"),
-  updateProfile: (profileData) => api.put("/auth/profile/", profileData),
+  updateProfile: (profileData) => {
+    // Handle FormData uploads specially to avoid interceptor issues
+    if (profileData instanceof FormData) {
+      return api.put("/auth/profile/", profileData, {
+        headers: {
+          'Accept': 'application/json',
+          // Don't set Content-Type for FormData - let axios handle it
+        },
+        timeout: 30000, // 30 second timeout for file uploads
+      });
+    }
+    return api.put("/auth/profile/", profileData);
+  },
   
   // Gửi yêu cầu làm shipper/restaurant
   requestRole: (requestData) => api.post("/auth/request/", requestData),

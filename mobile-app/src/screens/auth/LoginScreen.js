@@ -6,7 +6,8 @@ import { TextInput, Button, Card, IconButton } from "react-native-paper"
 import { useAuth } from "../../context/AuthContext"
 import { colors, spacing } from "../../theme/theme"
 
-export default function LoginScreen({ navigation }) {
+export default function LoginScreen({ navigation, route }) {
+  const returnTo = route?.params?.returnTo
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
@@ -37,6 +38,11 @@ export default function LoginScreen({ navigation }) {
         }
       }
       Alert.alert("Đăng nhập thất bại", String(msg))
+    } else {
+      // Login successful - navigate to returnTo screen or default
+      if (returnTo) {
+        navigation.navigate(returnTo)
+      }
     }
   }
 
@@ -104,7 +110,7 @@ export default function LoginScreen({ navigation }) {
 
         <View style={styles.registerContainer}>
           <Text style={styles.registerText}>Chưa có tài khoản? </Text>
-          <Button mode="text" onPress={() => navigation.navigate("Register")} textColor={colors.primary} compact>
+          <Button mode="text" onPress={() => navigation.navigate("Register", { returnTo })} textColor={colors.primary} compact>
             Đăng ký ngay
           </Button>
         </View>

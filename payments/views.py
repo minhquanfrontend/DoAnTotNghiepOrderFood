@@ -15,6 +15,8 @@ import base64
 from .models import Payment, PaymentMethod, Refund
 from .serializers import PaymentSerializer, PaymentMethodSerializer, CreatePaymentSerializer, RefundSerializer
 from orders.models import Order
+import requests
+import json
 
 # ==================== HELPER FUNCTIONS ====================
 
@@ -30,6 +32,100 @@ def generate_qr_code_base64(data):
     buffer.seek(0)
     img_base64 = base64.b64encode(buffer.getvalue()).decode()
     return f"data:image/png;base64,{img_base64}"
+
+
+def get_paypal_access_token():
+    """Get PayPal access token for API calls"""
+    client_id = getattr(settings, 'PAYPAL_CLIENT_ID', '')
+    client_secret = getattr(settings, 'PAYPAL_CLIENT_SECRET', '')
+    
+    if not client_id or not client_secret:
+        raise ValueError("PayPal credentials not configured")
+    
+    # Use sandbox or live based on settings
+    is_sandbox = getattr(settings, 'PAYPAL_SANDBOX', True)
+    base_url = 'https://api-m.sandbox.paypal.com' if is_sandbox else 'https://api-m.paypal.com'
+    
+    url = f"{base_url}/v1/oauth2/token"
+    headers = {
+        'Accept': 'application/json',
+        'Accept-Language': 'en_US',
+    }
+    data = {'grant_type': 'client_credentials'}
+    
+    response = requests.post(url, headers=headers, data=data, auth=(client_id, client_secret))
+    
+    if response.status_code == 200:
+        return response.json().get('access_token'), base_url
+    else:
+        raise Exception(f"Failed to get PayPal access token: {response.text}")
+
+
+def generate_paypal_order(order, payment, request):
+    """Create PayPal order and return approval URL"""
+    try:
+        access_token, base_url = get_paypal_access_token()
+        
+        # Convert VND to USD (approximate rate - in production use real exchange rate API)
+        # PayPal doesn't support VND directly, so we convert
+        vnd_to_usd_rate = 24000  # 1 USD = ~24,000 VND
+        amount_usd = round(float(order.total_amount) / vnd_to_usd_rate, 2)
+        
+        # Minimum PayPal amount is $1
+        if amount_usd < 1:
+            amount_usd = 1.00
+        
+        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+        
+        url = f"{base_url}/v2/checkout/orders"
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {access_token}',
+        }
+        
+        payload = {
+            'intent': 'CAPTURE',
+            'purchase_units': [{
+                'reference_id': f'ORDER_{order.id}',
+                'description': f'Food Delivery Order #{order.order_number or order.id}',
+                'amount': {
+                    'currency_code': 'USD',
+                    'value': str(amount_usd)
+                }
+            }],
+            'application_context': {
+                'brand_name': 'Food Delivery',
+                'landing_page': 'LOGIN',
+                'user_action': 'PAY_NOW',
+                'return_url': f"{frontend_url}/payment-success?method=paypal&payment_id={payment.id}",
+                'cancel_url': f"{frontend_url}/payment-cancel?method=paypal&payment_id={payment.id}"
+            }
+        }
+        
+        response = requests.post(url, headers=headers, json=payload)
+        
+        if response.status_code in [200, 201]:
+            result = response.json()
+            paypal_order_id = result.get('id')
+            
+            # Find approval URL
+            approval_url = None
+            for link in result.get('links', []):
+                if link.get('rel') == 'approve':
+                    approval_url = link.get('href')
+                    break
+            
+            return {
+                'paypal_order_id': paypal_order_id,
+                'payment_url': approval_url,
+                'amount_usd': amount_usd,
+                'amount_vnd': float(order.total_amount)
+            }
+        else:
+            raise Exception(f"PayPal order creation failed: {response.text}")
+            
+    except Exception as e:
+        raise Exception(f"PayPal error: {str(e)}")
 
 def generate_vnpay_url(order, payment, request):
     """Generate VNPay payment URL"""
@@ -174,6 +270,53 @@ def create_payment(request):
             'txn_ref': vnpay_data.get('txn_ref')
         })
     
+    elif payment_method == 'paypal':
+        # PayPal Payment
+        # Check if PayPal is configured
+        paypal_client_id = getattr(settings, 'PAYPAL_CLIENT_ID', '')
+        paypal_client_secret = getattr(settings, 'PAYPAL_CLIENT_SECRET', '')
+        
+        if not paypal_client_id or not paypal_client_secret:
+            payment.status = 'failed'
+            payment.save()
+            return Response({
+                'error': 'PayPal chưa được cấu hình. Vui lòng liên hệ admin hoặc chọn phương thức thanh toán khác.',
+                'details': 'PAYPAL_CLIENT_ID và PAYPAL_CLIENT_SECRET chưa được thiết lập trong settings.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            paypal_data = generate_paypal_order(order, payment, request)
+            payment.status = 'processing'
+            payment.gateway_response = paypal_data
+            payment.save()
+            
+            # PayPal orders start as unpaid (waiting for payment)
+            order.status = 'unpaid'
+            order.payment_status = 'pending'
+            order.save()
+            
+            return Response({
+                'message': 'Chuyển hướng đến PayPal để thanh toán',
+                'payment': PaymentSerializer(payment).data,
+                'payment_url': paypal_data.get('payment_url'),
+                'paypal_order_id': paypal_data.get('paypal_order_id'),
+                'amount_usd': paypal_data.get('amount_usd'),
+                'amount_vnd': paypal_data.get('amount_vnd')
+            })
+        except ValueError as e:
+            # Configuration error
+            payment.status = 'failed'
+            payment.save()
+            return Response({
+                'error': 'PayPal chưa được cấu hình đúng.',
+                'details': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            payment.status = 'failed'
+            payment.save()
+            return Response({'error': f'Lỗi PayPal: {str(e)}'}, 
+                           status=status.HTTP_400_BAD_REQUEST)
+    
     else:
         return Response({'error': 'Phương thức thanh toán không được hỗ trợ'}, 
                        status=status.HTTP_400_BAD_REQUEST)
@@ -181,7 +324,10 @@ def create_payment(request):
 @api_view(['GET'])
 @permission_classes([permissions.AllowAny])
 def get_payment_methods(request):
-    """Get available payment methods - Only VNPay and COD"""
+    """Get available payment methods - COD, VNPay, PayPal"""
+    # Check if PayPal is configured
+    paypal_enabled = bool(getattr(settings, 'PAYPAL_CLIENT_ID', '')) and bool(getattr(settings, 'PAYPAL_CLIENT_SECRET', ''))
+    
     methods = [
         {
             'id': 'cash',
@@ -198,6 +344,15 @@ def get_payment_methods(request):
             'description': 'Thanh toán online qua VNPay',
             'icon': 'card-outline',
             'enabled': True,
+            'fee': 0,
+            'type': 'online'
+        },
+        {
+            'id': 'paypal',
+            'name': 'PayPal',
+            'description': 'Thanh toán quốc tế qua PayPal',
+            'icon': 'logo-paypal',
+            'enabled': paypal_enabled,
             'fee': 0,
             'type': 'online'
         }
@@ -334,6 +489,95 @@ def vnpay_callback(request):
         return Response({'error': 'Payment not found'}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+# ==================== PAYPAL CALLBACK ====================
+
+@api_view(['GET', 'POST'])
+@permission_classes([permissions.AllowAny])
+def paypal_callback(request):
+    """Handle PayPal payment callback after user approves payment"""
+    try:
+        # Get parameters from request
+        paypal_order_id = request.GET.get('token') or request.data.get('orderID')
+        payment_id = request.GET.get('payment_id') or request.data.get('payment_id')
+        
+        if not payment_id:
+            return Response({'error': 'Missing payment_id'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        payment = Payment.objects.get(id=payment_id)
+        
+        # Capture the PayPal payment
+        try:
+            access_token, base_url = get_paypal_access_token()
+            
+            # Get PayPal order ID from payment gateway_response if not provided
+            if not paypal_order_id and payment.gateway_response:
+                paypal_order_id = payment.gateway_response.get('paypal_order_id')
+            
+            if not paypal_order_id:
+                return Response({'error': 'Missing PayPal order ID'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Capture the payment
+            capture_url = f"{base_url}/v2/checkout/orders/{paypal_order_id}/capture"
+            headers = {
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {access_token}',
+            }
+            
+            capture_response = requests.post(capture_url, headers=headers)
+            
+            if capture_response.status_code in [200, 201]:
+                capture_data = capture_response.json()
+                
+                if capture_data.get('status') == 'COMPLETED':
+                    # Payment successful
+                    payment.status = 'completed'
+                    payment.transaction_id = capture_data.get('id')
+                    payment.paid_at = timezone.now()
+                    payment.gateway_response = capture_data
+                    payment.save()
+                    
+                    # Update order
+                    payment.order.payment_status = 'paid'
+                    payment.order.status = 'pending'
+                    payment.order.save()
+                    
+                    # Send confirmation email
+                    try:
+                        from orders.email_service import send_order_confirmation_email
+                        send_order_confirmation_email(payment.order)
+                    except Exception:
+                        pass
+                    
+                    return Response({
+                        'success': True,
+                        'message': 'Thanh toán PayPal thành công',
+                        'order_id': payment.order.id,
+                        'payment': PaymentSerializer(payment).data
+                    })
+                else:
+                    raise Exception(f"Payment not completed: {capture_data.get('status')}")
+            else:
+                raise Exception(f"Capture failed: {capture_response.text}")
+                
+        except Exception as e:
+            payment.status = 'failed'
+            payment.save()
+            return Response({'error': f'Lỗi xác nhận thanh toán: {str(e)}'}, 
+                           status=status.HTTP_400_BAD_REQUEST)
+            
+    except Payment.DoesNotExist:
+        return Response({'error': 'Payment not found'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+def paypal_capture(request):
+    """Capture PayPal payment - called from frontend after user approves"""
+    return paypal_callback(request)
+
 
 # ==================== PAYMENT METHOD VIEWS ====================
 

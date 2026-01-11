@@ -1,10 +1,14 @@
 from decimal import Decimal, ROUND_HALF_UP
+import requests
+import logging
 
 from django.db.models import Avg, Count
-from django.db.models.signals import post_save, post_delete
+from django.db.models.signals import post_save, post_delete, pre_save
 from django.dispatch import receiver
 
 from .models import Food, Restaurant, Review
+
+logger = logging.getLogger(__name__)
 
 
 def _normalize_rating(value):
@@ -48,3 +52,70 @@ def update_ratings_on_save(sender, instance, **kwargs):
 @receiver(post_delete, sender=Review)
 def update_ratings_on_delete(sender, instance, **kwargs):
     _sync_related_ratings(instance)
+
+
+def geocode_address(address):
+    """Geocode address to latitude/longitude using Nominatim"""
+    if not address or len(address.strip()) < 5:
+        return None, None
+    
+    try:
+        url = "https://nominatim.openstreetmap.org/search"
+        params = {
+            'q': address,
+            'format': 'json',
+            'limit': 1,
+            'countrycodes': 'vn',
+            'addressdetails': 1
+        }
+        headers = {
+            'User-Agent': 'FoodDeliveryApp/1.0'
+        }
+        
+        response = requests.get(url, params=params, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data and len(data) > 0:
+                lat = Decimal(str(data[0]['lat']))
+                lng = Decimal(str(data[0]['lon']))
+                logger.info(f"Geocoded '{address}' to ({lat}, {lng})")
+                return lat, lng
+    except Exception as e:
+        logger.error(f"Geocoding error for '{address}': {e}")
+    
+    return None, None
+
+
+@receiver(pre_save, sender=Restaurant)
+def auto_geocode_restaurant_address(sender, instance, **kwargs):
+    """
+    Tự động geocode địa chỉ nhà hàng khi:
+    1. Địa chỉ mới được thêm
+    2. Địa chỉ bị thay đổi
+    3. Chưa có tọa độ
+    """
+    # Kiểm tra xem đây là update hay create
+    if instance.pk:
+        try:
+            old_instance = Restaurant.objects.get(pk=instance.pk)
+            address_changed = old_instance.address != instance.address
+        except Restaurant.DoesNotExist:
+            address_changed = True
+    else:
+        address_changed = True
+    
+    # Chỉ geocode nếu:
+    # - Địa chỉ thay đổi, HOẶC
+    # - Chưa có tọa độ và có địa chỉ
+    should_geocode = (
+        (address_changed and instance.address) or
+        (not instance.latitude and not instance.longitude and instance.address)
+    )
+    
+    if should_geocode:
+        lat, lng = geocode_address(instance.address)
+        if lat is not None and lng is not None:
+            instance.latitude = lat
+            instance.longitude = lng
+            logger.info(f"Updated restaurant '{instance.name}' coordinates to ({lat}, {lng})")

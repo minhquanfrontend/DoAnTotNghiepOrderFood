@@ -31,6 +31,7 @@ const UnifiedCheckoutScreen = ({ route, navigation }) => {
   // Address state
   const [address, setAddress] = useState("")
   const [phone, setPhone] = useState("")
+  const [email, setEmail] = useState("")
   const [coords, setCoords] = useState(null)
   const [note, setNote] = useState("")
   
@@ -102,11 +103,15 @@ const UnifiedCheckoutScreen = ({ route, navigation }) => {
           }
         }
         
-        // Load phone from profile
+        // Load phone and email from profile
         try {
           const profile = await authAPI.getProfile()
           const p = profile?.phone || profile?.phone_number || profile?.mobile
           if (p) setPhone(String(p))
+          
+          // Load email
+          const e = profile?.email
+          if (e) setEmail(String(e))
           
           // Also try to get address from profile if not set
           if (!address) {
@@ -167,6 +172,13 @@ const UnifiedCheckoutScreen = ({ route, navigation }) => {
       icon: "card-outline",
       color: "#0066CC",
     },
+    {
+      id: "paypal",
+      name: "PayPal",
+      description: "Thanh toán quốc tế qua PayPal (USD)",
+      icon: "logo-paypal",
+      color: "#003087",
+    },
   ]
 
   // Validate before placing order
@@ -177,6 +189,16 @@ const UnifiedCheckoutScreen = ({ route, navigation }) => {
     }
     if (!phone.trim()) {
       Alert.alert("Thiếu số điện thoại", "Vui lòng nhập số điện thoại người nhận")
+      return false
+    }
+    if (!email.trim()) {
+      Alert.alert("Thiếu email", "Vui lòng nhập email để nhận xác nhận đơn hàng")
+      return false
+    }
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email.trim())) {
+      Alert.alert("Email không hợp lệ", "Vui lòng nhập địa chỉ email hợp lệ")
       return false
     }
     if (!cart?.items?.length) {
@@ -239,6 +261,7 @@ const UnifiedCheckoutScreen = ({ route, navigation }) => {
         delivery_fee: safeToFixed(deliveryFee),
         delivery_address: address.trim(),
         delivery_phone: phone.trim(),
+        customer_email: email.trim(),
         payment_method: selectedMethod || 'cash',
         notes: note || '',
       }
@@ -304,6 +327,55 @@ const UnifiedCheckoutScreen = ({ route, navigation }) => {
           Alert.alert(
             "Lỗi thanh toán",
             "Không thể tạo thanh toán VNPay. Đơn hàng đã được tạo, bạn có thể thanh toán lại sau.",
+            [
+              {
+                text: "Xem đơn hàng",
+                onPress: () => navigation.replace("OrderTrackingScreen", { orderId: order.id }),
+              },
+            ]
+          )
+        }
+      } else if (selectedMethod === "paypal") {
+        // PayPal - Create payment and redirect
+        try {
+          const paymentResponse = await paymentAPI.createPayment({
+            order_id: order.id,
+            payment_method: "paypal",
+          })
+
+          const paymentUrl = paymentResponse?.payment_url || 
+                            paymentResponse?.data?.payment_url || 
+                            paymentResponse?.redirect_url
+
+          if (paymentUrl) {
+            await clearCart()
+            // Show amount in USD
+            const amountUsd = paymentResponse?.amount_usd || 0
+            Alert.alert(
+              "Chuyển hướng PayPal",
+              `Số tiền thanh toán: $${amountUsd} USD\n(Tương đương ${formatVND(total)})`,
+              [
+                {
+                  text: "Thanh toán ngay",
+                  onPress: async () => {
+                    await Linking.openURL(String(paymentUrl))
+                    navigation.replace("OrderTrackingScreen", { orderId: order.id })
+                  },
+                },
+                {
+                  text: "Hủy",
+                  style: "cancel",
+                },
+              ]
+            )
+          } else {
+            throw new Error("Không thể tạo thanh toán PayPal")
+          }
+        } catch (paymentError) {
+          console.error("PayPal error:", paymentError)
+          Alert.alert(
+            "Lỗi thanh toán",
+            "Không thể tạo thanh toán PayPal. Đơn hàng đã được tạo, bạn có thể thanh toán lại sau.",
             [
               {
                 text: "Xem đơn hàng",
@@ -380,6 +452,15 @@ const UnifiedCheckoutScreen = ({ route, navigation }) => {
             value={phone}
             onChangeText={setPhone}
             keyboardType="phone-pad"
+          />
+
+          <TextInput
+            style={styles.emailInput}
+            placeholder="Email nhận xác nhận đơn hàng *"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
           />
 
           <TextInput
@@ -569,6 +650,14 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   phoneInput: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    marginTop: 12,
+  },
+  emailInput: {
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: 8,

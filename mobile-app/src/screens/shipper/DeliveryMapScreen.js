@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
-import { StyleSheet, View, Alert, Text, ScrollView, TouchableOpacity, Linking } from "react-native";
-import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from "react-native-maps";
+import { StyleSheet, View, Alert, Text, ScrollView, TouchableOpacity, Linking, Dimensions } from "react-native";
+import MapView, { Marker, PROVIDER_DEFAULT, Callout } from "react-native-maps";
 import { Button, Card } from "react-native-paper";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from 'expo-location';
 import { orderAPI, authAPI } from "../../services/api";
 import { theme } from "../../theme/theme";
+
+const { width, height } = Dimensions.get('window');
 
 export default function DeliveryMapScreen({ route, navigation }) {
   const { orderId } = route.params || {}
@@ -106,6 +108,28 @@ export default function DeliveryMapScreen({ route, navigation }) {
     return { latitude: lat, longitude: lng, latitudeDelta: 0.04, longitudeDelta: 0.04 };
   };
 
+  // Fit map to show all markers
+  const fitMapToMarkers = () => {
+    const coords = [];
+    if (driver) coords.push(driver);
+    if (pickup) coords.push(pickup);
+    if (dest) coords.push(dest);
+    
+    if (coords.length >= 2 && mapRef.current) {
+      mapRef.current.fitToCoordinates(coords, {
+        edgePadding: { top: 80, right: 50, bottom: 50, left: 50 },
+        animated: true,
+      });
+    }
+  };
+
+  // Fit map when order and locations are loaded
+  useEffect(() => {
+    if (order && (pickup || dest)) {
+      setTimeout(fitMapToMarkers, 500);
+    }
+  }, [order, pickup, dest]);
+
   // Refresh route info from server
   const refreshRouteInfo = async () => {
     try {
@@ -202,31 +226,55 @@ export default function DeliveryMapScreen({ route, navigation }) {
         initialRegion={initialRegion()}
         provider={PROVIDER_DEFAULT}
         mapType="standard"
+        showsUserLocation={false}
       >
-        {driver && <Marker coordinate={driver} title="Vị trí của bạn" pinColor="blue" />}
-        {pickup && <Marker coordinate={pickup} title="Nhà hàng" pinColor="orange" />}
-        {dest && <Marker coordinate={dest} title="Khách hàng" pinColor="green" />}
-
-        {/* Simple line from driver to pickup (instead of Google Directions) */}
-        {driver && pickup && stage === 'pickup' && (
-          <Polyline
-            coordinates={[driver, pickup]}
-            strokeWidth={4}
-            strokeColor="#FF6B35"
-            lineDashPattern={[10, 5]}
-          />
+        {/* Driver/Shipper marker */}
+        {driver && (
+          <Marker coordinate={driver} title="Vị trí của bạn">
+            <View style={styles.driverMarker}>
+              <Ionicons name="bicycle" size={20} color="#fff" />
+            </View>
+          </Marker>
+        )}
+        
+        {/* Restaurant/Pickup marker - always show */}
+        {pickup && (
+          <Marker coordinate={pickup} title={order?.restaurant_name || "Nhà hàng"}>
+            <View style={styles.restaurantMarker}>
+              <Ionicons name="restaurant" size={20} color="#fff" />
+            </View>
+            <Callout>
+              <View style={styles.calloutContainer}>
+                <Text style={styles.calloutTitle}>{order?.restaurant_name || 'Nhà hàng'}</Text>
+                <Text style={styles.calloutText}>{order?.pickup_address}</Text>
+                <Text style={styles.calloutPhone}>📞 {order?.pickup_phone || 'N/A'}</Text>
+              </View>
+            </Callout>
+          </Marker>
+        )}
+        
+        {/* Customer/Delivery marker - always show */}
+        {dest && (
+          <Marker coordinate={dest} title={order?.customer_name || "Khách hàng"}>
+            <View style={styles.customerMarker}>
+              <Ionicons name="person" size={20} color="#fff" />
+            </View>
+            <Callout>
+              <View style={styles.calloutContainer}>
+                <Text style={styles.calloutTitle}>{order?.customer_name || 'Khách hàng'}</Text>
+                <Text style={styles.calloutText}>{order?.delivery_address}</Text>
+                <Text style={styles.calloutPhone}>📞 {order?.delivery_phone || order?.customer_phone || 'N/A'}</Text>
+              </View>
+            </Callout>
+          </Marker>
         )}
 
-        {/* Simple line from driver to destination */}
-        {driver && dest && (stage === 'start_delivery' || stage === 'delivery') && (
-          <Polyline
-            coordinates={[driver, dest]}
-            strokeWidth={4}
-            strokeColor="#1E90FF"
-            lineDashPattern={[10, 5]}
-          />
-        )}
       </MapView>
+
+      {/* Floating button to fit all markers */}
+      <TouchableOpacity style={styles.fitButton} onPress={fitMapToMarkers}>
+        <Ionicons name="expand" size={24} color={theme.colors.primary} />
+      </TouchableOpacity>
 
       {/* Order Info Panel */}
       <View style={styles.infoPanel}>
@@ -244,35 +292,43 @@ export default function DeliveryMapScreen({ route, navigation }) {
           <Text style={[styles.stageLabel, stage === 'delivery' && styles.stageLabelActive]}>Giao hàng</Text>
         </View>
 
-        {/* Address Info based on stage */}
-        {stage === 'pickup' ? (
-          <View style={styles.addressCard}>
+        {/* Both addresses - always show for reference */}
+        <ScrollView style={styles.addressScroll} showsVerticalScrollIndicator={false}>
+          {/* Restaurant Info */}
+          <View style={[styles.addressCard, stage === 'pickup' && styles.addressCardActive]}>
             <View style={styles.addressHeader}>
-              <Ionicons name="restaurant" size={24} color="#FF6B35" />
-              <Text style={styles.addressTitle}>Lấy hàng tại nhà hàng</Text>
+              <View style={[styles.addressIcon, { backgroundColor: '#FF6B35' }]}>
+                <Ionicons name="restaurant" size={18} color="#fff" />
+              </View>
+              <View style={styles.addressInfo}>
+                <Text style={styles.addressLabel}>Lấy hàng tại</Text>
+                <Text style={styles.addressName}>{order?.restaurant_name || 'Nhà hàng'}</Text>
+                <Text style={styles.addressText} numberOfLines={2}>{order?.pickup_address || 'Đang tải...'}</Text>
+              </View>
+              <TouchableOpacity style={styles.callIconBtn} onPress={callRestaurant}>
+                <Ionicons name="call" size={20} color="#FF6B35" />
+              </TouchableOpacity>
             </View>
-            <Text style={styles.addressName}>{order?.restaurant_name || 'Nhà hàng'}</Text>
-            <Text style={styles.addressText}>{order?.pickup_address || 'Đang tải địa chỉ...'}</Text>
-            <TouchableOpacity style={styles.callButton} onPress={callRestaurant}>
-              <Ionicons name="call" size={20} color="white" />
-              <Text style={styles.callButtonText}>Gọi nhà hàng</Text>
-            </TouchableOpacity>
           </View>
-        ) : (
-          <View style={styles.addressCard}>
+
+          {/* Customer Info */}
+          <View style={[styles.addressCard, (stage === 'start_delivery' || stage === 'delivery') && styles.addressCardActive]}>
             <View style={styles.addressHeader}>
-              <Ionicons name="location" size={24} color="#4CAF50" />
-              <Text style={styles.addressTitle}>Giao hàng cho khách</Text>
+              <View style={[styles.addressIcon, { backgroundColor: '#4CAF50' }]}>
+                <Ionicons name="person" size={18} color="#fff" />
+              </View>
+              <View style={styles.addressInfo}>
+                <Text style={styles.addressLabel}>Giao hàng cho</Text>
+                <Text style={styles.addressName}>{order?.customer_name || 'Khách hàng'}</Text>
+                <Text style={styles.addressText} numberOfLines={2}>{order?.delivery_address || 'Đang tải...'}</Text>
+                <Text style={styles.phoneText}>📞 {order?.delivery_phone || order?.customer_phone || 'Không có SĐT'}</Text>
+              </View>
+              <TouchableOpacity style={styles.callIconBtn} onPress={callCustomer}>
+                <Ionicons name="call" size={20} color="#4CAF50" />
+              </TouchableOpacity>
             </View>
-            <Text style={styles.addressName}>{order?.customer_name || 'Khách hàng'}</Text>
-            <Text style={styles.addressText}>{order?.delivery_address || 'Đang tải địa chỉ...'}</Text>
-            <Text style={styles.phoneText}>📞 {order?.delivery_phone || 'Không có SĐT'}</Text>
-            <TouchableOpacity style={styles.callButton} onPress={callCustomer}>
-              <Ionicons name="call" size={20} color="white" />
-              <Text style={styles.callButtonText}>Gọi khách hàng</Text>
-            </TouchableOpacity>
           </View>
-        )}
+        </ScrollView>
 
         {/* Action Button */}
         <Button
@@ -292,9 +348,9 @@ export default function DeliveryMapScreen({ route, navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  map: { flex: 0.5 },
+  map: { flex: 0.55 },
   infoPanel: {
-    flex: 0.5,
+    flex: 0.45,
     backgroundColor: '#fff',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
@@ -332,7 +388,7 @@ const styles = StyleSheet.create({
   stageLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   stageLabel: {
     fontSize: 12,
@@ -344,55 +400,124 @@ const styles = StyleSheet.create({
     color: theme.colors.primary,
     fontWeight: 'bold',
   },
+  addressScroll: {
+    flex: 1,
+    marginBottom: 8,
+  },
   addressCard: {
     backgroundColor: '#f8f8f8',
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  addressCardActive: {
+    borderColor: theme.colors.primary,
+    backgroundColor: '#fff',
   },
   addressHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
+    alignItems: 'flex-start',
   },
-  addressTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-    marginLeft: 8,
-  },
-  addressName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
-  },
-  addressText: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
-  },
-  phoneText: {
-    fontSize: 14,
-    color: '#333',
-    marginBottom: 12,
-  },
-  callButton: {
-    flexDirection: 'row',
+  addressIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.colors.success,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    marginRight: 12,
   },
-  callButtonText: {
-    color: 'white',
-    fontWeight: '600',
-    marginLeft: 8,
+  addressInfo: {
+    flex: 1,
+  },
+  addressLabel: {
+    fontSize: 12,
+    color: '#999',
+    marginBottom: 2,
+  },
+  addressName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 2,
+  },
+  addressText: {
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 18,
+  },
+  phoneText: {
+    fontSize: 13,
+    color: '#333',
+    marginTop: 4,
+  },
+  callIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   actionButton: {
     marginTop: 8,
     paddingVertical: 8,
+  },
+  // Custom markers
+  driverMarker: {
+    backgroundColor: '#2196F3',
+    padding: 8,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  restaurantMarker: {
+    backgroundColor: '#FF6B35',
+    padding: 8,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  customerMarker: {
+    backgroundColor: '#4CAF50',
+    padding: 8,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  calloutContainer: {
+    width: 200,
+    padding: 8,
+  },
+  calloutTitle: {
+    fontWeight: 'bold',
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  calloutText: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  calloutPhone: {
+    fontSize: 12,
+    color: '#333',
+  },
+  fitButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    backgroundColor: '#fff',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
 })

@@ -46,28 +46,28 @@ const API = axios.create({
 // // Các endpoint không cần xác thực
 // const PUBLIC_ENDPOINTS = [
 //   '/auth/',
-//   '/restaurants/',
-//   '/foods/',
-//   '/categories/',
-//   '/banners/',
-//   '/recommendations/'
-// ];
 
 // Helper: public endpoints that should not require auth
 const isPublicEndpoint = (url = "", method = "get") => {
   try {
     const path = url.split("?")[0];
+    // Some call sites may include an /api prefix; normalize so matching is consistent.
+    const cleanPath = path.replace(/^\/api/, "");
     const publicPaths = [
       "/auth/login/",
       "/auth/register/",
       "/auth/token/refresh/",
       "/auth/token/verify/",
       "/restaurants/",
+      "/restaurants/banners/",
+      "/restaurants/categories/",
+      "/restaurants/categories-with-foods/",
       "/foods/",
       "/categories/",
       "/provinces/",
       "/banners/",
       "/reviews/",
+      "/ai/recommendations/",
     ];
 
     // Specific private endpoints that should always require auth
@@ -78,12 +78,12 @@ const isPublicEndpoint = (url = "", method = "get") => {
     ];
 
     // Check if this is a private endpoint
-    if (privatePaths.some(p => path.startsWith(p))) {
+    if (privatePaths.some((p) => cleanPath.startsWith(p))) {
       return false;
     }
 
     // Check if this is a public endpoint
-    if (publicPaths.some(p => path.startsWith(p))) {
+    if (publicPaths.some((p) => cleanPath.startsWith(p))) {
       return true;
     }
 
@@ -125,9 +125,11 @@ API.interceptors.request.use(
     
     // Skip auth for public endpoints
     if (isPublic) {
-      if (config.headers?.Authorization) {
-        delete config.headers.Authorization;
-      }
+      // IMPORTANT: Public endpoints must never include Authorization.
+      // If a stale/expired token is attached, backend returns 403 even though endpoint is AllowAny.
+      config.headers = config.headers || {};
+      delete config.headers.Authorization;
+      delete config.headers.authorization;
       return config;
     }
 

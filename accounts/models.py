@@ -2,6 +2,7 @@ from django.db import models
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.utils.translation import gettext_lazy as _
+import uuid
 
 
 # -------------------- Custom User Manager --------------------
@@ -49,6 +50,10 @@ class User(AbstractUser):
     user_type = models.CharField(max_length=20, choices=USER_TYPES, default="customer")
     approval_status = models.CharField(max_length=20, choices=APPROVAL_STATUS, default="pending")
 
+    is_email_verified = models.BooleanField(default=False)
+    email_verification_token = models.UUIDField(default=uuid.uuid4, editable=False, null=True, blank=True)
+    email_verification_expires = models.DateTimeField(null=True, blank=True)
+
     # Vị trí shipper
     current_latitude = models.FloatField(null=True, blank=True)
     current_longitude = models.FloatField(null=True, blank=True)
@@ -58,6 +63,28 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.username
+
+    def is_verification_token_valid(self):
+        from django.utils import timezone
+        return (
+            self.email_verification_token and
+            self.email_verification_expires and
+            self.email_verification_expires > timezone.now()
+        )
+
+    def generate_verification_token(self):
+        from django.utils import timezone
+
+        self.email_verification_token = uuid.uuid4()
+        self.email_verification_expires = timezone.now() + timezone.timedelta(hours=24)
+        self.save(update_fields=["email_verification_token", "email_verification_expires"])
+        return self.email_verification_token
+
+    def verify_email(self):
+        self.is_email_verified = True
+        self.email_verification_token = None
+        self.email_verification_expires = None
+        self.save(update_fields=["is_email_verified", "email_verification_token", "email_verification_expires"])
 
 
 # -------------------- UserRequest --------------------

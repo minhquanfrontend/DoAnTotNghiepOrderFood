@@ -23,6 +23,7 @@ from .serializers import (
     CustomerOrderSerializer, get_order_serializer_for_user
 )
 from .permissions import IsOwnerOrAdmin, IsSellerOfOrder, IsShipperOfOrder
+from .email_service import send_order_confirmation_email, send_order_status_update_email
 from restaurants.models import Food, Restaurant
 
 
@@ -317,6 +318,7 @@ def create_order(request):
             order = Order.objects.create(
                 customer=request.user,
                 restaurant=restaurant,
+                customer_email=serializer.validated_data.get("customer_email", "") or request.user.email or "",
                 delivery_address=serializer.validated_data.get("delivery_address", "") or "",
                 delivery_phone=serializer.validated_data.get("delivery_phone", "") or "",
                 delivery_latitude=serializer.validated_data.get("delivery_latitude"),
@@ -379,6 +381,27 @@ def create_order(request):
             cart.items.all().delete()
         except Exception:
             pass
+        
+        # Save user delivery info for future orders
+        try:
+            user = request.user
+            delivery_address = serializer.validated_data.get("delivery_address", "")
+            delivery_phone = serializer.validated_data.get("delivery_phone", "")
+            
+            # Update user profile with delivery info if not already set
+            if delivery_address and not getattr(user, 'address', None):
+                user.address = delivery_address
+            if delivery_phone and not getattr(user, 'phone_number', None):
+                user.phone_number = delivery_phone
+            user.save()
+        except Exception as e:
+            print(f"[create_order] Could not save user delivery info: {e}")
+        
+        # Send order confirmation email
+        try:
+            send_order_confirmation_email(order)
+        except Exception as e:
+            print(f"[create_order] Could not send confirmation email: {e}")
 
     return Response({"message": "Đặt hàng thành công", "order": OrderSerializer(order).data},
                     status=status.HTTP_201_CREATED)
@@ -714,6 +737,7 @@ def update_order_status(request, order_id):
         }
         
         if action not in ACTIONS:
+            print(f"[UPDATE-STATUS] ❌ Invalid action: {action}. Valid actions: {list(ACTIONS.keys())}")
             return Response({
                 'success': False,
                 'error': f'Hành động không hợp lệ. Các hành động: {", ".join(ACTIONS.keys())}'
@@ -725,15 +749,17 @@ def update_order_status(request, order_id):
         allowed_from = action_config['from']
         if isinstance(allowed_from, list):
             if order.status not in allowed_from:
+                print(f"[UPDATE-STATUS] ❌ Status mismatch: current='{order.status}', required={allowed_from}, action='{action}'")
                 return Response({
                     'success': False,
-                    'error': f'Không thể thực hiện "{action}" ở trạng thái "{order.get_status_display()}"'
+                    'error': f'Không thể thực hiện "{action}" ở trạng thái "{order.get_status_display()}". Trạng thái hiện tại: {order.status}'
                 }, status=status.HTTP_400_BAD_REQUEST)
         else:
             if order.status != allowed_from:
+                print(f"[UPDATE-STATUS] ❌ Status mismatch: current='{order.status}', required='{allowed_from}', action='{action}'")
                 return Response({
                     'success': False,
-                    'error': f'Không thể thực hiện "{action}" khi đơn đang ở trạng thái "{order.get_status_display()}". '
+                    'error': f'Không thể thực hiện "{action}" khi đơn đang ở trạng thái "{order.status}". '
                              f'Đơn phải ở trạng thái "{allowed_from}"'
                 }, status=status.HTTP_400_BAD_REQUEST)
         
@@ -775,6 +801,14 @@ def update_order_status(request, order_id):
             message=action_config['message'],
             created_at=timezone.now()
         )
+        
+        # Send email notification for important status changes
+        try:
+            if action_config['to'] in ['delivered', 'completed']:
+                send_order_status_update_email(order, action_config['to'], action_config['message'])
+                print(f"[UPDATE-STATUS] Email sent for status: {action_config['to']}")
+        except Exception as e:
+            print(f"[UPDATE-STATUS] Could not send status email: {e}")
         
         # Use role-specific serializer for response
         SerializerClass = get_order_serializer_for_user(user)
@@ -1118,6 +1152,13 @@ def mark_delivered(request, order_id):
         message="Shipper đã giao thành công",
         created_at=timezone.now()
     )
+
+    # Send email notification for delivery completion
+    try:
+        send_order_status_update_email(order, "delivered", "Shipper đã giao thành công")
+        print(f"[MARK_DELIVERED] Email sent for order {order.id}")
+    except Exception as e:
+        print(f"[MARK_DELIVERED] Could not send delivery email: {e}")
 
     if getattr(order, "customer", None):
         try:

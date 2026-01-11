@@ -6,6 +6,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 
 from .models import User, UserRequest
+from .email_service import send_verification_email, send_welcome_email
 from .serializers import (
     UserRegistrationSerializer,
     UserLoginSerializer,
@@ -34,10 +35,18 @@ class RegisterView(generics.CreateAPIView):
         user = serializer.save()
         tokens = get_tokens_for_user(user)
 
+        email_sent = False
+        try:
+            verification_token = user.generate_verification_token()
+            email_sent = send_verification_email(user, verification_token)
+        except Exception as e:
+            print(f"Could not send verification email: {e}")
+
         return Response({
-            "message": "Đăng ký thành công",
+            "message": "Đăng ký thành công. Vui lòng kiểm tra email để xác thực tài khoản.",
             "user": UserProfileSerializer(user).data,
             "tokens": tokens,
+            "email_sent": email_sent,
         }, status=status.HTTP_201_CREATED)
 
 # -------------------- Đăng nhập --------------------
@@ -73,6 +82,53 @@ class ProfileView(generics.RetrieveUpdateAPIView):
         except Exception:
             data = {}
         print('ProfileView.perform_update - validated_data:', data)
+        
+        # Check if email is being changed
+        old_email = self.request.user.email
+        new_email = data.get('email')
+        email_changed = new_email and old_email != new_email
+        
+        if email_changed:
+            print(f'Email change detected: {old_email} -> {new_email}')
+            # Send verification email to OLD email address before updating
+            try:
+                from .email_service import send_verification_email
+                # Generate new verification token but don't save it yet
+                import uuid
+                from django.utils import timezone
+                
+                verification_token = uuid.uuid4()
+                # Send to OLD email with message about email change
+                from django.core.mail import EmailMultiAlternatives
+                from django.conf import settings
+                
+                subject = "Xác nhận thay đổi email - Food Delivery"
+                text_content = f"""
+Xin chào {self.request.user.get_full_name() or self.request.user.username},
+
+Bạn đã yêu cầu thay đổi email từ {old_email} sang {new_email}.
+
+Để xác nhận thay đổi này, vui lòng bấm vào liên kết sau:
+http://localhost:3000/verify-email-change?token={verification_token}
+
+Nếu bạn không thực hiện thay đổi này, vui lòng bỏ qua email này.
+
+Trân trọng,
+Food Delivery Team
+"""
+                
+                email = EmailMultiAlternatives(
+                    subject=subject,
+                    body=text_content,
+                    from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', None) or settings.EMAIL_HOST_USER,
+                    to=[old_email],  # Send to OLD email
+                )
+                email.send(fail_silently=False)
+                print(f'Email change verification sent to OLD email: {old_email}')
+                
+            except Exception as e:
+                print(f'Could not send email change verification: {e}')
+        
         user = serializer.save()
         # log saved fields for debugging vietnamese characters
         print('ProfileView.perform_update - saved first_name:', user.first_name)
@@ -94,6 +150,55 @@ class LogoutView(APIView):
 
         except TokenError:
             return Response({"message": "Đăng xuất thành công"}, status=status.HTTP_200_OK)
+
+
+class VerifyEmailView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        token = request.data.get("token")
+        if not token:
+            return Response({"error": "Token là bắt buộc"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            import uuid
+            token_uuid = uuid.UUID(str(token))
+            user = User.objects.get(email_verification_token=token_uuid)
+
+            if not user.is_verification_token_valid():
+                return Response({"error": "Token đã hết hạn hoặc không hợp lệ"}, status=status.HTTP_400_BAD_REQUEST)
+
+            user.verify_email()
+            try:
+                send_welcome_email(user)
+            except Exception as e:
+                print(f"Could not send welcome email: {e}")
+
+            return Response({"message": "Email đã được xác thực thành công!", "email_verified": True}, status=status.HTTP_200_OK)
+        except (ValueError, User.DoesNotExist):
+            return Response({"error": "Token không hợp lệ"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ResendVerificationView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+
+        if user.is_email_verified:
+            return Response({"message": "Email đã được xác thực"}, status=status.HTTP_200_OK)
+
+        if not user.email:
+            return Response({"error": "Không tìm thấy email của người dùng"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            verification_token = user.generate_verification_token()
+            email_sent = send_verification_email(user, verification_token)
+            return Response({"message": "Email xác thực đã được gửi lại", "email_sent": email_sent}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": "Không thể gửi email xác thực"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # -------------------- Yêu cầu người dùng --------------------
 class CreateUserRequestView(generics.CreateAPIView):

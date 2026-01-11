@@ -71,8 +71,26 @@ class SellerOrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
     tracking = OrderTrackingSerializer(many=True, read_only=True)
     customer_name = serializers.SerializerMethodField()
+    customer_phone = serializers.SerializerMethodField()
+    customer_email = serializers.SerializerMethodField()
     restaurant_name = serializers.CharField(source='restaurant.name', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    
+    def get_customer_phone(self, obj):
+        """Get customer phone - from delivery_phone or customer profile"""
+        if obj.delivery_phone:
+            return obj.delivery_phone
+        if obj.customer and obj.customer.phone_number:
+            return obj.customer.phone_number
+        return ''
+    
+    def get_customer_email(self, obj):
+        """Get customer email"""
+        if obj.customer_email:
+            return obj.customer_email
+        if obj.customer and obj.customer.email:
+            return obj.customer.email
+        return ''
     
     def get_customer_name(self, obj):
         """Get customer name - handle guest orders"""
@@ -97,7 +115,7 @@ class SellerOrderSerializer(serializers.ModelSerializer):
         model = Order
         fields = [
             'id', 'order_number', 'status', 'status_display', 'payment_status',
-            'customer_name', 'restaurant', 'restaurant_name',
+            'customer_name', 'customer_phone', 'customer_email', 'restaurant', 'restaurant_name',
             # Seller sees pickup info (their restaurant)
             'pickup_address', 'pickup_phone', 'pickup_latitude', 'pickup_longitude',
             # Seller also needs delivery info to know where order goes
@@ -119,15 +137,35 @@ class ShipperOrderSerializer(serializers.ModelSerializer):
     """
     items = OrderItemSerializer(many=True, read_only=True)
     tracking = OrderTrackingSerializer(many=True, read_only=True)
-    customer_name = serializers.CharField(source='customer.get_full_name', read_only=True)
+    customer_name = serializers.SerializerMethodField()
+    customer_phone = serializers.SerializerMethodField()
     restaurant_name = serializers.CharField(source='restaurant.name', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    
+    def get_customer_name(self, obj):
+        """Get customer name"""
+        if obj.guest_name:
+            return obj.guest_name
+        if obj.customer:
+            full_name = obj.customer.get_full_name()
+            if full_name and full_name.strip():
+                return full_name
+            return obj.customer.username
+        return 'Khách vãng lai'
+    
+    def get_customer_phone(self, obj):
+        """Get customer phone - from delivery_phone or customer profile"""
+        if obj.delivery_phone:
+            return obj.delivery_phone
+        if obj.customer and obj.customer.phone_number:
+            return obj.customer.phone_number
+        return ''
     
     class Meta:
         model = Order
         fields = [
             'id', 'order_number', 'status', 'status_display', 'payment_status',
-            'customer_name', 'restaurant', 'restaurant_name',
+            'customer_name', 'customer_phone', 'restaurant', 'restaurant_name',
             # Shipper sees BOTH addresses
             'pickup_address', 'pickup_phone', 'pickup_latitude', 'pickup_longitude',
             'delivery_address', 'delivery_phone', 'delivery_latitude', 'delivery_longitude',
@@ -250,6 +288,9 @@ class CreateOrderSerializer(serializers.Serializer):
     pickup_phone = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="")
     pickup_latitude = serializers.DecimalField(max_digits=10, decimal_places=8, required=False, allow_null=True)
     pickup_longitude = serializers.DecimalField(max_digits=11, decimal_places=8, required=False, allow_null=True)
+    
+    # Customer email for order confirmation
+    customer_email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
     
     # Extra fields from frontend (ignored but accepted to prevent validation errors)
     items = serializers.ListField(required=False, allow_empty=True, allow_null=True)

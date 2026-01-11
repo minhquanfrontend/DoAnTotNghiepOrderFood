@@ -9,6 +9,8 @@ from .views import (
     LoginView,
     ProfileView,
     LogoutView,
+    VerifyEmailView,
+    ResendVerificationView,
     CreateUserRequestView,
     MyRequestsView,
     UserRequestListView,      
@@ -27,6 +29,8 @@ urlpatterns = [
     path("login/", LoginView.as_view(), name="login"),
     path("profile/", ProfileView.as_view(), name="profile"),
     path("logout/", LogoutView.as_view(), name="logout"),
+    path("verify-email/", VerifyEmailView.as_view(), name="verify-email"),
+    path("resend-verification/", ResendVerificationView.as_view(), name="resend-verification"),
 
     # requests
     path("requests/create/", CreateUserRequestView.as_view(), name="create_request"),

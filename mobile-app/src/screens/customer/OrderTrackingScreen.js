@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Linking, Alert } from "react-native"
-import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from "react-native-maps"
+import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps"
 import { Ionicons } from "@expo/vector-icons"
 import { theme } from "../../theme/theme"
 import api, { orderAPI } from "../../services/api"
@@ -279,25 +279,6 @@ const OrderTrackingScreen = ({ route, navigation }) => {
                 title="Điểm giao hàng"
                 description={tracking.delivery_location?.address || 'Địa chỉ của bạn'}
                 pinColor="green"
-              />
-            )}
-
-            {/* Draw line from shipper to delivery location */}
-            {(shipperLocation || tracking.current_location) && tracking.delivery_location?.lat && (
-              <Polyline
-                coordinates={[
-                  {
-                    latitude: shipperLocation?.latitude || tracking.current_location?.latitude || tracking.current_location?.lat,
-                    longitude: shipperLocation?.longitude || tracking.current_location?.longitude || tracking.current_location?.lng,
-                  },
-                  {
-                    latitude: parseFloat(tracking.delivery_location.lat),
-                    longitude: parseFloat(tracking.delivery_location.lng),
-                  }
-                ]}
-                strokeColor={theme.colors.primary}
-                strokeWidth={3}
-                lineDashPattern={[10, 5]}
               />
             )}
           </MapView>
