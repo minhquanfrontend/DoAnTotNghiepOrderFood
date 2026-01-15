@@ -29,7 +29,7 @@ Windows (PowerShell):
 
 ```bash
 python -m venv venv
-.\venv\Scripts\Activate.ps1
+.\venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
@@ -101,7 +101,7 @@ Mặc định API sẽ chạy tại:
 
 ```bash
 cd mobile-app
-npm install
+npx install
 ```
 
 ### 4.2 Chạy Expo
