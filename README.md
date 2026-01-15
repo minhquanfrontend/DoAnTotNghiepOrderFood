@@ -107,7 +107,7 @@ npx install
 ### 4.2 Chạy Expo
 
 ```bash
-npx run start
+npx expo run start
 ```
 
 ### 4.3 Cấu hình Base URL API cho app
