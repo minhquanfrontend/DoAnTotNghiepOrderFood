@@ -107,7 +107,7 @@ npm install
 ### 4.2 Chạy Expo
 
 ```bash
-npm run start
+npx run start
 ```
 
 ### 4.3 Cấu hình Base URL API cho app
